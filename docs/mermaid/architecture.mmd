@@ -1,0 +1,18 @@
+flowchart TD
+    Client["Client / User"] --> API["Atlas API (Node.js/Express)"]
+    API --> DB[(PostgreSQL)]
+    API --> Redis[(Redis)]
+    
+    Scheduler["Atlas Scheduler (Node.js)"] --> DB
+    Scheduler --> Redis
+    
+    Worker1["Atlas Worker 1 (Node.js)"] --> DB
+    Worker1 --> Redis
+    
+    WorkerN["Atlas Worker N (Node.js)"] --> DB
+    WorkerN --> Redis
+    
+    subgraph Infrastructure
+        DB
+        Redis
+    end

@@ -1,0 +1,15 @@
+stateDiagram-v2
+    [*] --> SCHEDULED : Schedule triggered
+    [*] --> QUEUED : Enqueued directly
+    SCHEDULED --> QUEUED : Time reached
+    QUEUED --> CLAIMED : Worker claims job
+    CLAIMED --> RUNNING : Worker begins execution
+    RUNNING --> COMPLETED : Execution successful
+    RUNNING --> FAILED : Execution throws error
+    FAILED --> QUEUED : Retry policy allows
+    FAILED --> [*] : Max retries exhausted (DLQ)
+    COMPLETED --> [*]
+    
+    state "Any state before RUNNING" as PreExecution
+    PreExecution --> CANCELLED : User cancels job
+    CANCELLED --> [*]

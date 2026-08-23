@@ -1,0 +1,53 @@
+erDiagram
+    users {
+        String id PK
+        String email UK
+        String password_hash
+        DateTime created_at
+    }
+    organizations {
+        String id PK
+        String name
+        DateTime created_at
+    }
+    projects {
+        String id PK
+        String organization_id FK
+        String name
+        DateTime created_at
+    }
+    queues {
+        String id PK
+        String project_id FK
+        String retry_policy_id FK
+        String name
+        Int concurrency_limit
+        Boolean is_paused
+    }
+    job_schedules {
+        String id PK
+        String queue_id FK
+        String schedule_type
+        String cron_expression
+        DateTime next_run_at
+    }
+    jobs {
+        String id PK
+        String queue_id FK
+        String schedule_id FK
+        String status
+        Json payload
+        DateTime available_at
+    }
+    workers {
+        String id PK
+        String hostname
+        String status
+        Int concurrency
+    }
+    
+    users ||--o{ organization_members : memberships
+    organizations ||--o{ projects : has
+    projects ||--o{ queues : contains
+    queues ||--o{ jobs : contains
+    queues ||--o{ job_schedules : contains
