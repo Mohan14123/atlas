@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+*.env.local
+server/src/generated/
+server/prisma/migrations/
+*.log
+.DS_Store
