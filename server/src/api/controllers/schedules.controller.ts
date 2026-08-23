@@ -212,44 +212,44 @@ export async function updateSchedule(req: Request, res: Response, next: NextFunc
     let paramIndex = 2;
 
     if (updates.schedule_type !== undefined) {
-      setClauses.push(\`schedule_type = $\${paramIndex++}\`);
+      setClauses.push(`schedule_type = $${paramIndex++}`);
       values.push(updates.schedule_type);
     }
     if (updates.cron_expression !== undefined) {
-      setClauses.push(\`cron_expression = $\${paramIndex++}\`);
+      setClauses.push(`cron_expression = $${paramIndex++}`);
       values.push(updates.cron_expression);
     }
     if (updates.timezone !== undefined) {
-      setClauses.push(\`timezone = $\${paramIndex++}\`);
+      setClauses.push(`timezone = $${paramIndex++}`);
       values.push(updates.timezone);
     }
     if (updates.job_type !== undefined) {
-      setClauses.push(\`job_type = $\${paramIndex++}\`);
+      setClauses.push(`job_type = $${paramIndex++}`);
       values.push(updates.job_type);
     }
     if (updates.job_priority !== undefined) {
-      setClauses.push(\`job_priority = $\${paramIndex++}\`);
+      setClauses.push(`job_priority = $${paramIndex++}`);
       values.push(updates.job_priority);
     }
     if (updates.job_payload !== undefined) {
-      setClauses.push(\`job_payload = $\${paramIndex++}\`);
+      setClauses.push(`job_payload = $${paramIndex++}`);
       values.push(updates.job_payload);
     }
     if (updates.enabled !== undefined) {
-      setClauses.push(\`enabled = $\${paramIndex++}\`);
+      setClauses.push(`enabled = $${paramIndex++}`);
       values.push(updates.enabled);
     }
     
     // Always update next_run_at if it was computed or provided
-    setClauses.push(\`next_run_at = $\${paramIndex++}\`);
+    setClauses.push(`next_run_at = $${paramIndex++}`);
     values.push(newNextRunAt);
 
     const { rows } = await pool.query(
-      \`UPDATE job_schedules
-       SET \${setClauses.join(', ')}
+      `UPDATE job_schedules
+       SET ${setClauses.join(', ')}
        WHERE id = $1
        RETURNING id, queue_id, schedule_type, cron_expression, timezone,
-                 job_type, job_priority, job_payload, next_run_at, last_run_at, enabled, created_at\`,
+                 job_type, job_priority, job_payload, next_run_at, last_run_at, enabled, created_at`,
       values
     );
 
@@ -268,7 +268,7 @@ export async function deleteSchedule(req: Request, res: Response, next: NextFunc
     await verifyScheduleAccess(scheduleId, userId);
 
     const { rowCount } = await pool.query(
-      \`DELETE FROM job_schedules WHERE id = $1\`,
+      `DELETE FROM job_schedules WHERE id = $1`,
       [scheduleId]
     );
 

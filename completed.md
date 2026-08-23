@@ -146,3 +146,27 @@
 - `server/src/api/middlewares/auth.ts` [MODIFIED]
 - `progress.json` [MODIFIED]
 - `completed.md` [MODIFIED]
+
+---
+
+## 2026-08-23 — Phase 5 implemented (Schedules API)
+
+**Phase 5 — Schedules API (atlas-api)**
+
+- `server/src/shared/lib/cron.ts` — `getNextRunAt(expr, tz)` using `cron-parser` (version 5.x `parse` method)
+- `server/src/api/controllers/schedules.controller.ts` — CRUD operations for Schedules with cron validation and next_run_at calculation
+- `server/src/api/routes/schedules.routes.ts` — Mounted under queues routes
+- `server/tests/api/schedules.test.ts` — Integration tests for schedule CRUD operations
+- Executed `npm run test server/tests/api/schedules.test.ts` cleanly
+- Extracted and recovered missing `user/phases.md` and `user/detailed_api.md` from transcript logs
+- Pushed changes to GitHub
+
+**Files touched:**
+- `server/src/shared/lib/cron.ts` [NEW]
+- `server/src/api/controllers/schedules.controller.ts` [NEW]
+- `server/src/api/routes/schedules.routes.ts` [NEW]
+- `server/src/api/routes/queues.routes.ts` [MODIFIED]
+- `server/tests/api/schedules.test.ts` [NEW]
+- `docs/user/phases.md` [MODIFIED]
+- `progress.json` [MODIFIED]
+- `completed.md` [MODIFIED]
