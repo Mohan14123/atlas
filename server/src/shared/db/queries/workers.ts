@@ -33,11 +33,9 @@ export async function upsertHeartbeat(
     [workerId, activeJobs],
   );
   await pool.query(
-    `UPDATE workers SET status = $2, active_jobs_count = $3 WHERE id = $1`,
-    [workerId, activeJobs > 0 ? 'active' : 'idle', activeJobs],
-  ).catch(() => {
-    // active_jobs_count column may not exist on base Worker model — safe to ignore
-  });
+    `UPDATE workers SET status = $2 WHERE id = $1`,
+    [workerId, activeJobs > 0 ? 'active' : 'idle'],
+  );
 }
 
 /** Returns workers whose most recent heartbeat is older than `thresholdMs`. */

@@ -70,6 +70,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://atlas_user:atlas_password@localhost:5432/atlas_test?schema=public
           REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test_ci_secret_key
         run: npm run test:concurrency
 
       - name: Verify Docker Compose Build
