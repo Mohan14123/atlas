@@ -2,12 +2,30 @@ import express from 'express';
 import cors from 'cors';
 import routes from './routes';
 import { errorHandler } from './middlewares/error';
+import { logger } from '../shared/lib/logger';
 
 export function createApp() {
   const app = express();
 
+  logger.setService('api');
+
   app.use(cors());
   app.use(express.json());
+
+  // HTTP request logging middleware
+  app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+      const durationMs = Date.now() - start;
+      logger.info(`HTTP ${req.method} ${req.originalUrl}`, {
+        method: req.method,
+        url: req.originalUrl,
+        status: res.statusCode,
+        duration_ms: durationMs,
+      });
+    });
+    next();
+  });
 
   // Health check
   app.get('/health', (req, res) => {

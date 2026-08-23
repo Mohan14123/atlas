@@ -305,3 +305,9 @@
 - Created `server/Dockerfile.scheduler` to build the Scheduler container.
 - Created `server/Dockerfile.worker` to build the Worker container.
 - Created `server/docker-compose.yml` defining the full multi-container architecture (postgres, redis, pgbouncer, api, scheduler, worker, and frontend).
+
+## 2026-08-23 — Phase 13: Observability
+- Added HTTP request logging middleware in `server/src/api/app.ts` to log incoming requests along with their duration.
+- Added per-tick timing logs to the Scheduler loop in `server/src/scheduler/scheduler.ts` to measure overhead and execution time.
+- Enhanced the Worker job processing logs in `server/src/worker/worker.ts` to track and log the execution duration for both successful and failed jobs.
+- The `GET /metrics` endpoint derives and delivers robust metrics directly from Postgres, as originally designed.

@@ -134,6 +134,8 @@ export class AtlasWorker {
     await this.semaphore.acquire();
     this.incrementActiveJobs();
 
+    const startMs = Date.now();
+
     try {
       // 2. Transition to RUNNING
       await transitionJobStatus(pool, jobId, 'CLAIMED', 'RUNNING', {
@@ -145,13 +147,15 @@ export class AtlasWorker {
       const result = await handler(payload);
 
       // 4. Mark as COMPLETED
+      const durationMs = Date.now() - startMs;
       await transitionJobStatus(pool, jobId, 'RUNNING', 'COMPLETED', {
         completed_at: new Date(),
       });
-      logger.info(`Completed job ${jobId}`, { service: 'worker', job_id: jobId });
+      logger.info(`Completed job ${jobId}`, { service: 'worker', job_id: jobId, duration_ms: durationMs, status: 'COMPLETED' });
 
     } catch (err: any) {
-      logger.error(`Job ${jobId} failed`, { error: err.message, service: 'worker', job_id: jobId });
+      const durationMs = Date.now() - startMs;
+      logger.error(`Job ${jobId} failed`, { error: err.message, service: 'worker', job_id: jobId, duration_ms: durationMs, status: 'FAILED' });
       
       try {
         // Find current status to ensure we can transition

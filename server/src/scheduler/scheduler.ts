@@ -43,6 +43,8 @@ export class SchedulerLoop {
   }
 
   private async tick() {
+    const startMs = Date.now();
+
     // 1. detect stale workers
     await detectStaleWorkers().catch(err => {
       logger.error('Tick error in detectStaleWorkers', { error: err.message, service: 'scheduler' });
@@ -72,6 +74,9 @@ export class SchedulerLoop {
     await reconcile().catch(err => {
       logger.error('Tick error in reconcile', { error: err.message, service: 'scheduler' });
     });
+
+    const durationMs = Date.now() - startMs;
+    logger.info('Scheduler tick completed', { service: 'scheduler', duration_ms: durationMs });
   }
 
   private sleep(ms: number): Promise<void> {
