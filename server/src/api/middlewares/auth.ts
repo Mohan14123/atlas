@@ -8,13 +8,6 @@ export interface AuthUser {
   email: string;
 }
 
-declare global {
-  namespace Express {
-    interface Request {
-      user?: AuthUser;
-    }
-  }
-}
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
