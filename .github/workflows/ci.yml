@@ -64,3 +64,14 @@ jobs:
           JWT_SECRET: test_ci_secret_key
           PORT: 3000
         run: npm test
+
+      - name: Run concurrency tests
+        working-directory: ./server
+        env:
+          DATABASE_URL: postgresql://atlas_user:atlas_password@localhost:5432/atlas_test?schema=public
+          REDIS_URL: redis://localhost:6379
+        run: npm run test:concurrency
+
+      - name: Verify Docker Compose Build
+        working-directory: ./server
+        run: docker-compose build
