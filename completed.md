@@ -191,3 +191,39 @@
 - `.env.example` [NEW]
 - `.gitignore` [MODIFIED]
 - `completed.md` [MODIFIED]
+
+---
+
+## 2026-08-23 — Phase 6 implemented (Jobs API)
+
+**Phase 6 — Jobs API (atlas-api) — 8 endpoints**
+
+- `server/src/api/controllers/jobs.controller.ts` — Full CRUD for jobs:
+  - `POST /queues/:queueId/jobs` — Create single job (immediate/delayed/scheduled mode)
+  - `POST /queues/:queueId/jobs/batch` — Create batch jobs atomically (single pg transaction)
+  - `GET /queues/:queueId/jobs` — List jobs with status/type filters and pagination
+  - `GET /jobs/:jobId` — Get full job detail including payload
+  - `GET /jobs/:jobId/executions` — Get execution attempts with duration_ms
+  - `GET /jobs/:jobId/logs` — Get structured logs with execution_id and level filters
+  - `POST /jobs/:jobId/retry` — Retry FAILED jobs (state machine enforced, resets attempt count)
+  - `POST /jobs/:jobId/cancel` — Cancel SCHEDULED/QUEUED jobs (state machine enforced)
+- Idempotency: `ON CONFLICT (idempotency_key) DO NOTHING` — returns existing job with 409
+- BullMQ enqueue: immediate jobs are dispatched to Redis/BullMQ on creation
+- State machine: retry only from FAILED, cancel only from SCHEDULED/QUEUED
+- Job logs: retry and cancel events are persisted as INFO-level job_logs
+- `server/src/api/routes/jobs.routes.ts` — Queue-scoped job routes (list, create, batch)
+- `server/src/api/routes/index.ts` — Individual job routes (detail, executions, logs, retry, cancel)
+- `server/src/api/routes/queues.routes.ts` — Mounted jobs routes under `/:queueId/jobs`
+- `server/tests/api/jobs.test.ts` — 15 integration tests covering all 8 endpoints
+- All 41 tests across 6 suites pass cleanly
+- `tsc --noEmit`: 0 errors
+
+**Files touched:**
+- `server/src/api/controllers/jobs.controller.ts` [NEW]
+- `server/src/api/routes/jobs.routes.ts` [NEW]
+- `server/src/api/routes/index.ts` [MODIFIED]
+- `server/src/api/routes/queues.routes.ts` [MODIFIED]
+- `server/tests/api/jobs.test.ts` [NEW]
+- `progress.json` [MODIFIED]
+- `completed.md` [MODIFIED]
+
