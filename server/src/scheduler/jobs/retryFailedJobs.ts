@@ -48,24 +48,28 @@ export async function retryFailedJobs() {
       
       // Idempotent conditional update
       const { rowCount } = await pool.query(`
-        UPDATE jobs
-        SET status = $1,
-            available_at = NOW() + ($2 || ' milliseconds')::interval,
-            updated_at = NOW()
-        WHERE id = $3
-          AND status = 'FAILED'
-          AND attempt_count < max_attempts
-      `, [nextStatus, Math.round(delayMs), job.id]);
+        WITH updated AS (
+          UPDATE jobs
+          SET    status = $2, available_at = NOW() + ($3 || ' milliseconds')::interval, attempt_count = attempt_count + 1, updated_at = NOW()
+          WHERE  id = $1
+            AND  status = 'FAILED'
+            AND  attempt_count < max_attempts
+          RETURNING id
+        ),
+        log AS (
+          INSERT INTO job_logs (id, job_id, level, message)
+          SELECT gen_random_uuid(), id, 'INFO', 'Status transitioned from FAILED to ' || $2::text || ' (Retry Mechanism)'
+          FROM updated
+          RETURNING id
+        )
+        SELECT pg_notify('job_updated', json_build_object('job_id', u.id, 'status', $2)::text)
+        FROM updated u
+      `, [job.id, nextStatus, Math.round(delayMs)]);
 
       // Only enqueue if we actually updated the row AND it's going straight to QUEUED
       if (rowCount === 1 && nextStatus === 'QUEUED') {
-        const bullQueue = new BullQueue('atlas-jobs', { connection: getRedis() });
-        await bullQueue.add(job.type, {
-          jobId: job.id,
-          queueId: job.queue_id,
-          jobType: job.type,
-          payload: job.payload,
-        }, { jobId: job.id });
+        const bullQueue = new BullQueue(`atlas_${job.queue_id}`, { connection: getRedis() });
+        await bullQueue.add(job.type, { jobId: job.id }, { jobId: job.id });
         await bullQueue.close();
       }
 

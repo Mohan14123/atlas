@@ -19,29 +19,31 @@ export async function recoverOrphanedJobs() {
       // Conditionally update to QUEUED only if it's still CLAIMED/RUNNING and assigned to an unhealthy worker.
       // This prevents race conditions if the worker recovers and updates the status concurrently.
       const { rows } = await pool.query<{ id: string, queue_id: string, type: string, payload: any }>(`
-        UPDATE jobs
-        SET status = 'QUEUED',
-            worker_id = NULL,
-            claimed_at = NULL,
-            updated_at = NOW()
-        WHERE id = $1
-          AND status IN ('CLAIMED', 'RUNNING')
-          AND EXISTS (
-            SELECT 1 FROM workers w WHERE w.id = jobs.worker_id AND w.status = 'unhealthy'
-          )
-        RETURNING id, queue_id, type, payload
+        WITH updated AS (
+          UPDATE jobs
+          SET    status = 'QUEUED', worker_id = NULL, updated_at = NOW()
+          WHERE  id = $1
+            AND  status IN ('CLAIMED', 'RUNNING')
+            AND  EXISTS (
+              SELECT 1 FROM workers w WHERE w.id = jobs.worker_id AND w.status = 'unhealthy'
+            )
+          RETURNING id, queue_id, type, payload
+        ),
+        log AS (
+          INSERT INTO job_logs (id, job_id, level, message)
+          SELECT gen_random_uuid(), id, 'WARN', 'Status transitioned from RUNNING/CLAIMED to QUEUED (Worker Orphaned)'
+          FROM updated
+          RETURNING id
+        )
+        SELECT u.id, u.queue_id, u.type, u.payload, pg_notify('job_updated', json_build_object('job_id', u.id, 'status', 'QUEUED')::text)
+        FROM updated u
       `, [job.id]);
 
       // Only enqueue if we actually updated the row
       if (rows.length === 1) {
         const updatedJob = rows[0];
-        const bullQueue = new BullQueue('atlas-jobs', { connection: getRedis() });
-        await bullQueue.add(updatedJob.type, {
-          jobId: updatedJob.id,
-          queueId: updatedJob.queue_id,
-          jobType: updatedJob.type,
-          payload: updatedJob.payload,
-        }, { jobId: updatedJob.id });
+        const bullQueue = new BullQueue(`atlas_${updatedJob.queue_id}`, { connection: getRedis() });
+        await bullQueue.add(updatedJob.type, { jobId: updatedJob.id }, { jobId: updatedJob.id });
         await bullQueue.close();
 
         logger.info(`Recovered orphaned job ${job.id} to QUEUED`, {
