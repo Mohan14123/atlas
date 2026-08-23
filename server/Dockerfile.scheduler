@@ -1,0 +1,18 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies first for better caching
+COPY package*.json ./
+RUN npm ci
+
+# Copy prisma schema and generate client
+COPY prisma ./prisma
+RUN npx prisma generate
+
+# Copy source code and config
+COPY tsconfig.json ./
+COPY src/ ./src/
+
+# Start Scheduler
+CMD ["npm", "run", "dev:scheduler"]
