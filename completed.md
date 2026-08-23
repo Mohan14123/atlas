@@ -280,3 +280,16 @@
 - `server/tests/api/metrics.test.ts` [NEW]
 - `progress.json` [MODIFIED]
 - `completed.md` [MODIFIED]
+
+## 2026-08-23 — Phase 9: atlas-scheduler service
+
+- Created `server/src/scheduler/index.ts` containing the service entrypoint and graceful shutdown mechanics.
+- Created `server/src/scheduler/scheduler.ts` with a non-overlapping asynchronous tick loop driving the scheduling tasks.
+- Created `server/src/scheduler/listen-notify.ts` providing PostgreSQL LISTEN capabilities on `schedule_changed` and `queue_changed` for immediate ticks.
+- Created `server/src/scheduler/jobs/detectStaleWorkers.ts` to flag unhealthy workers based on the 30s heartbeat invariant.
+- Created `server/src/scheduler/jobs/recoverOrphanedJobs.ts` to gracefully conditionally requeue jobs owned by unhealthy workers.
+- Created `server/src/scheduler/jobs/promoteDelayedJobs.ts` using idempotency updates to safely promote SCHEDULED jobs to QUEUED.
+- Created `server/src/scheduler/jobs/retryFailedJobs.ts` handling the backoff retry logic without mutating attempt_counts natively.
+- Created `server/src/scheduler/jobs/createDueJobs.ts` establishing exactly-once schedule triggers utilizing PostgreSQL `FOR UPDATE` and idempotency constraints.
+- Created `server/src/scheduler/jobs/reconcile.ts` connecting the missing link of BullMQ failures by looking up job identifiers directly in Redis queues.
+- Wrote integration tests covering all scheduler functionality in `server/tests/scheduler/scheduler.test.ts`. All test suites successfully verified.
