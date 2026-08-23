@@ -51,9 +51,20 @@ export async function claimNextJob(
 
     const job = rows[0];
     await client.query(`
-      UPDATE jobs
-      SET    status = 'CLAIMED', worker_id = $2, claimed_at = NOW(), updated_at = NOW()
-      WHERE  id = $1
+      WITH updated AS (
+        UPDATE jobs
+        SET    status = 'CLAIMED', worker_id = $2, claimed_at = NOW(), updated_at = NOW()
+        WHERE  id = $1
+        RETURNING id
+      ),
+      log AS (
+        INSERT INTO job_logs (id, job_id, level, message)
+        SELECT gen_random_uuid(), id, 'INFO', 'Status transitioned from QUEUED to CLAIMED'
+        FROM updated
+        RETURNING id
+      )
+      SELECT pg_notify('job_updated', json_build_object('job_id', id, 'status', 'CLAIMED')::text)
+      FROM updated
     `, [job.id, workerId]);
 
     await client.query('COMMIT');
@@ -102,9 +113,20 @@ export async function claimSpecificJob(
 
     const job = rows[0];
     await client.query(`
-      UPDATE jobs
-      SET    status = 'CLAIMED', worker_id = $2, claimed_at = NOW(), updated_at = NOW()
-      WHERE  id = $1
+      WITH updated AS (
+        UPDATE jobs
+        SET    status = 'CLAIMED', worker_id = $2, claimed_at = NOW(), updated_at = NOW()
+        WHERE  id = $1
+        RETURNING id
+      ),
+      log AS (
+        INSERT INTO job_logs (id, job_id, level, message)
+        SELECT gen_random_uuid(), id, 'INFO', 'Status transitioned from QUEUED to CLAIMED'
+        FROM updated
+        RETURNING id
+      )
+      SELECT pg_notify('job_updated', json_build_object('job_id', id, 'status', 'CLAIMED')::text)
+      FROM updated
     `, [job.id, workerId]);
 
     await client.query('COMMIT');
@@ -139,10 +161,20 @@ export async function transitionJobStatus(
   }
 
   vals.push(from);
-  const { rowCount } = await db.query(
-    `UPDATE jobs SET ${sets.join(', ')} WHERE id = $1 AND status = $${vals.length}`,
-    vals,
-  );
+  const { rowCount } = await db.query(`
+    WITH updated AS (
+      UPDATE jobs SET ${sets.join(', ')} WHERE id = $1 AND status = $${vals.length}
+      RETURNING id
+    ),
+    log AS (
+      INSERT INTO job_logs (id, job_id, level, message)
+      SELECT gen_random_uuid(), id, 'INFO', 'Status transitioned from ' || $${vals.length} || ' to ' || $2
+      FROM updated
+      RETURNING id
+    )
+    SELECT pg_notify('job_updated', json_build_object('job_id', id, 'status', $2)::text)
+    FROM updated
+  `, vals);
 
   if ((rowCount ?? 0) === 0) {
     throw new Error(`Job ${jobId} not in expected status '${from}' — possible concurrent claim`);
