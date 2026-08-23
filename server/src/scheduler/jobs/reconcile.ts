@@ -7,8 +7,8 @@ export async function reconcile() {
   const pool = getPool();
   try {
     // 1. Find jobs that have been QUEUED for more than 60 seconds
-    const { rows: staleQueuedJobs } = await pool.query<{ id: string; queue_id: string }>(`
-      SELECT id, queue_id
+    const { rows: staleQueuedJobs } = await pool.query<{ id: string; queue_id: string; type: string; payload: any }>(`
+      SELECT id, queue_id, type, payload
       FROM jobs
       WHERE status = 'QUEUED'
         AND updated_at < NOW() - interval '60 seconds'
@@ -25,12 +25,17 @@ export async function reconcile() {
       }
 
       // 3. Check BullMQ for existence by job ID
-      const bullQueue = new BullQueue(`atlas_${job.queue_id}`, { connection: getRedis() });
+      const bullQueue = new BullQueue('atlas-jobs', { connection: getRedis() });
       const bullJob = await bullQueue.getJob(job.id);
 
       if (!bullJob) {
         // 4. Missing from BullMQ! Re-enqueue it.
-        await bullQueue.add('reconcile', { jobId: job.id }, { jobId: job.id });
+        await bullQueue.add(job.type, {
+          jobId: job.id,
+          queueId: job.queue_id,
+          jobType: job.type,
+          payload: job.payload,
+        }, { jobId: job.id });
         logger.warn(`Reconciled missing BullMQ job ${job.id}`, {
           service: 'scheduler',
           job_id: job.id,
