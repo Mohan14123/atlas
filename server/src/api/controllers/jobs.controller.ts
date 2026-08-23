@@ -80,10 +80,10 @@ async function verifyJobAccess(jobId: string, userId: string): Promise<void> {
 }
 
 /**
- * Returns the global BullMQ Queue instance for enqueuing jobs.
+ * Returns the BullMQ Queue instance for enqueuing jobs.
  */
-function getBullQueue(): BullQueue {
-  return new BullQueue('atlas-jobs', { connection: getRedis() });
+function getBullQueue(queueId: string): BullQueue {
+  return new BullQueue(`atlas_${queueId}`, { connection: getRedis() });
 }
 
 /**
@@ -210,13 +210,8 @@ export async function createJob(req: Request, res: Response, next: NextFunction)
 
     // Enqueue to BullMQ for immediate jobs; delayed jobs are promoted by the scheduler
     if (status === 'QUEUED') {
-      const bullQueue = getBullQueue();
-      await bullQueue.add(type, {
-        jobId: job.id,
-        queueId: job.queue_id,
-        jobType: job.type,
-        payload: job.payload,
-      }, { jobId: job.id });
+      const bullQueue = getBullQueue(queueId);
+      await bullQueue.add(type, { jobId: job.id }, { jobId: job.id });
       await bullQueue.close();
     }
 
@@ -270,14 +265,9 @@ export async function createBatchJobs(req: Request, res: Response, next: NextFun
     await client.query('COMMIT');
 
     // Enqueue all to BullMQ outside the transaction (transport layer, not source of truth)
-    const bullQueue = getBullQueue();
+    const bullQueue = getBullQueue(queueId);
     for (const job of createdJobs) {
-      await bullQueue.add(job.type, {
-        jobId: job.id,
-        queueId: job.queue_id,
-        jobType: job.type,
-        payload: job.payload,
-      }, { jobId: job.id });
+      await bullQueue.add(job.type, { jobId: job.id }, { jobId: job.id });
     }
     await bullQueue.close();
 
@@ -528,13 +518,8 @@ export async function retryJob(req: Request, res: Response, next: NextFunction) 
     );
 
     // Re-enqueue to BullMQ
-    const bullQueue = getBullQueue();
-    await bullQueue.add(job.type, {
-      jobId,
-      queueId: job.queue_id,
-      jobType: job.type,
-      payload: job.payload,
-    }, { jobId });
+    const bullQueue = getBullQueue(job.queue_id);
+    await bullQueue.add(job.type, { jobId }, { jobId });
     await bullQueue.close();
 
     sendSuccess(res, updated);

@@ -195,13 +195,8 @@ export async function replayDLQ(req: Request, res: Response, next: NextFunction)
     );
 
     // Enqueue to BullMQ
-    const bullQueue = getBullQueue();
-    await bullQueue.add(newJob.type, {
-      jobId: newJob.id,
-      queueId: newJob.queue_id,
-      jobType: newJob.type,
-      payload: newJob.payload,
-    }, { jobId: newJob.id });
+    const bullQueue = new BullQueue(`atlas_${newJob.queue_id}`, { connection: getRedis() });
+    await bullQueue.add(newJob.type, { jobId: newJob.id }, { jobId: newJob.id });
     await bullQueue.close();
 
     sendSuccess(res, {
