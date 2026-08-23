@@ -227,3 +227,26 @@
 - `progress.json` [MODIFIED]
 - `completed.md` [MODIFIED]
 
+---
+
+## 2026-08-23 — Phase 7 implemented (DLQ API)
+
+**Phase 7 — DLQ API (atlas-api) — 3 endpoints**
+
+- `server/src/api/controllers/dlq.controller.ts` — CRUD operations for dead letter queue:
+  - `GET /dlq` — List DLQ entries with joined job info, pagination, and `queue_id` filtering
+  - `GET /dlq/:entryId` — Get single DLQ entry with job details and execution history
+  - `POST /dlq/:entryId/replay` — Atomically replay DLQ entry (create new job, delete DLQ row) and enqueue to BullMQ
+- `server/src/api/routes/dlq.routes.ts` — Router for DLQ API
+- `server/src/api/routes/index.ts` — Mount DLQ router under `/dlq`
+- `server/tests/api/dlq.test.ts` — 6 integration tests covering list, get, and replay functionality
+- All 47 tests across 7 suites pass cleanly
+- `tsc --noEmit`: 0 errors
+
+**Files touched:**
+- `server/src/api/controllers/dlq.controller.ts` [NEW]
+- `server/src/api/routes/dlq.routes.ts` [NEW]
+- `server/src/api/routes/index.ts` [MODIFIED]
+- `server/tests/api/dlq.test.ts` [NEW]
+- `progress.json` [MODIFIED]
+- `completed.md` [MODIFIED]

@@ -1,5 +1,5 @@
 {
-  "current_task": "Phase 7 — DLQ API (atlas-api)",
+  "current_task": "Phase 8 — Workers & Metrics API (atlas-api)",
   "completed_tasks": [
     "Planning: docs/user/phases.md, docs/user/detailed_api.md, docs/user/frontend_plan.md",
     "Phase 1: src/shared/config (env, db, redis), src/shared/lib (errors, logger, response, stateMachine), prisma/schema.prisma (13 models + migration), src/shared/db/queries (jobs, workers, schedules, dlq, metrics)",
@@ -10,10 +10,10 @@
     "Tests & CI: integration tests for APIs, github actions CI workflow",
     "Doc Recovery: restored docs/ folder, added to .gitignore, fixed type definitions",
     "Phase 5: Schedules API — atlas-api",
-    "Phase 6: Jobs API (8 endpoints: create, batch, list, detail, executions, logs, retry, cancel) — atlas-api"
+    "Phase 6: Jobs API (8 endpoints: create, batch, list, detail, executions, logs, retry, cancel) — atlas-api",
+    "Phase 7: DLQ API (3 endpoints: list, get, replay) — atlas-api"
   ],
   "pending_tasks": [
-    "Phase 7: DLQ API — atlas-api",
     "Phase 8: Workers & Metrics API — atlas-api",
     "Phase 9: atlas-scheduler service",
     "Phase 10: atlas-worker service",
@@ -24,5 +24,5 @@
     "Phase 15: Bonus (WebSocket, rate limiting)",
     "Phase 16: Final hardening & docs"
   ],
-  "last_updated_timestamp": "2026-08-23T12:56:00Z"
+  "last_updated_timestamp": "2026-08-23T13:13:00Z"
 }
