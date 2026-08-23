@@ -10,7 +10,7 @@ import { AppError, HttpStatus } from './errors';
  */
 export function getNextRunAt(cronExpression: string, timezone: string = 'UTC'): Date {
   try {
-    const interval = parser.parseExpression(cronExpression, { tz: timezone });
+    const interval = parser.parse(cronExpression, { tz: timezone });
     return interval.next().toDate();
   } catch (err: any) {
     throw new AppError(
