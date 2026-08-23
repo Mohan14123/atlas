@@ -7,8 +7,8 @@ export type JobStatus =
 const TRANSITIONS: Record<JobStatus, readonly JobStatus[]> = {
   SCHEDULED:  ['QUEUED',  'CANCELLED'],
   QUEUED:     ['CLAIMED', 'CANCELLED'],
-  CLAIMED:    ['RUNNING'],
-  RUNNING:    ['COMPLETED', 'FAILED'],
+  CLAIMED:    ['RUNNING', 'QUEUED'],
+  RUNNING:    ['COMPLETED', 'FAILED', 'QUEUED'],
   FAILED:     ['QUEUED'],           // scheduler retry path
   COMPLETED:  [],
   CANCELLED:  [],
