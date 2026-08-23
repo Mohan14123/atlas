@@ -170,3 +170,24 @@
 - `docs/user/phases.md` [MODIFIED]
 - `progress.json` [MODIFIED]
 - `completed.md` [MODIFIED]
+
+---
+
+## 2026-08-23 — Comprehensive Documentation Generated
+
+- Formatted `docs/mermaid/architecture.mmd` to cleanly separate physical and conceptual layers
+- Wrote detailed `docs/mermaid/er.mmd`, matching `schema.prisma` exactly
+- Created `docs/mermaid/job-state-machine.mmd`, `job-execution-sequence.mmd`, and `worker-recovery.mmd`
+- Generated all PNG assets in `docs/assets/` using local Chrome binary
+- Populated `README.md`, `docs/architecture.md`, `docs/decisions.md`, `docs/database.md`, `docs/testing.md`, `docs/failure-recovery.md`, `docs/state-machine.md`, `docs/sequence-diagrams.md`, `docs/deployment.md`, and `docs/SUBMISSION.md` with detailed project-specific system blueprints
+- Configured `.env.example`
+- Updated `.gitignore` to track `docs/` but exclude generated assets and temporary dirs
+
+**Files touched:**
+- `docs/` and all its root markdown files [MODIFIED / NEW]
+- `docs/mermaid/*.mmd` [MODIFIED / NEW]
+- `docs/assets/*.png` [NEW]
+- `README.md` [NEW]
+- `.env.example` [NEW]
+- `.gitignore` [MODIFIED]
+- `completed.md` [MODIFIED]
