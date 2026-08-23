@@ -10,6 +10,7 @@ import {
 } from '../controllers/queues.controller';
 import { validate } from '../middlewares/validate';
 import schedulesRoutes from './schedules.routes';
+import jobsRoutes from './jobs.routes';
 
 // mergeParams: true allows access to :projectId from the parent router
 const router = Router({ mergeParams: true });
@@ -22,5 +23,8 @@ router.delete('/:queueId', deleteQueue);
 
 // Mount nested schedules routes
 router.use('/:queueId/schedules', schedulesRoutes);
+
+// Mount nested jobs routes: /queues/:queueId/jobs
+router.use('/:queueId/jobs', jobsRoutes);
 
 export default router;
