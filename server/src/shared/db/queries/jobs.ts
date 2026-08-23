@@ -67,6 +67,57 @@ export async function claimNextJob(
 }
 
 /**
+ * Atomically claim a specific job by ID using pessimistic locking.
+ * Enforces queue paused status, job QUEUED status, and concurrency limits.
+ * Returns null if the job is already claimed, completed, or unclaimable.
+ */
+export async function claimSpecificJob(
+  pool: Pool,
+  jobId: string,
+  workerId: string,
+): Promise<JobRow | null> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows } = await client.query<JobRow>(`
+      SELECT j.id, j.queue_id, j.type, j.status, j.payload, j.attempt_count, j.max_attempts, j.worker_id
+      FROM   jobs   j
+      JOIN   queues q ON q.id = j.queue_id
+      WHERE  j.id            = $1
+        AND  j.status        = 'QUEUED'
+        AND  j.available_at <= NOW()
+        AND  q.is_paused     = false
+        AND (
+          SELECT COUNT(*) FROM jobs
+          WHERE  queue_id = j.queue_id AND status = 'RUNNING'
+        ) < q.concurrency_limit
+      FOR UPDATE OF j SKIP LOCKED
+    `, [jobId]);
+
+    if (rows.length === 0) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    const job = rows[0];
+    await client.query(`
+      UPDATE jobs
+      SET    status = 'CLAIMED', worker_id = $2, claimed_at = NOW(), updated_at = NOW()
+      WHERE  id = $1
+    `, [job.id, workerId]);
+
+    await client.query('COMMIT');
+    return { ...job, status: 'CLAIMED', worker_id: workerId };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Validate and apply a status transition, optionally patching timestamp columns.
  * Throws if the job is not in the expected `from` state (concurrent claim guard).
  */
