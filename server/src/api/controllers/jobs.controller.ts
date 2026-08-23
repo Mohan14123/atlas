@@ -80,11 +80,10 @@ async function verifyJobAccess(jobId: string, userId: string): Promise<void> {
 }
 
 /**
- * Returns a BullMQ Queue instance for enqueuing jobs.
- * Keyed by queueId to match the logical Atlas queue.
+ * Returns the global BullMQ Queue instance for enqueuing jobs.
  */
-function getBullQueue(queueId: string): BullQueue {
-  return new BullQueue(`atlas_${queueId}`, { connection: getRedis() });
+function getBullQueue(): BullQueue {
+  return new BullQueue('atlas-jobs', { connection: getRedis() });
 }
 
 /**
@@ -211,8 +210,13 @@ export async function createJob(req: Request, res: Response, next: NextFunction)
 
     // Enqueue to BullMQ for immediate jobs; delayed jobs are promoted by the scheduler
     if (status === 'QUEUED') {
-      const bullQueue = getBullQueue(queueId);
-      await bullQueue.add(type, { jobId: job.id }, { jobId: job.id });
+      const bullQueue = getBullQueue();
+      await bullQueue.add(type, {
+        jobId: job.id,
+        queueId: job.queue_id,
+        jobType: job.type,
+        payload: job.payload,
+      }, { jobId: job.id });
       await bullQueue.close();
     }
 
@@ -242,7 +246,7 @@ export async function createBatchJobs(req: Request, res: Response, next: NextFun
 
     await client.query('BEGIN');
 
-    const createdJobs: Array<{ id: string; status: string }> = [];
+    const createdJobs: Array<{ id: string; status: string; queue_id: string; type: string; payload: unknown }> = [];
 
     for (const def of jobDefs) {
       const maxAttempts = def.max_attempts ?? defaultMax;
@@ -257,7 +261,7 @@ export async function createBatchJobs(req: Request, res: Response, next: NextFun
            0, $5, $6,
            NOW(), NOW(), NOW()
          )
-         RETURNING id, status`,
+         RETURNING id, status, queue_id, type, payload`,
         [queueId, def.type, def.priority, JSON.stringify(def.payload), maxAttempts, def.idempotency_key || null],
       );
       createdJobs.push(job);
@@ -266,9 +270,14 @@ export async function createBatchJobs(req: Request, res: Response, next: NextFun
     await client.query('COMMIT');
 
     // Enqueue all to BullMQ outside the transaction (transport layer, not source of truth)
-    const bullQueue = getBullQueue(queueId);
+    const bullQueue = getBullQueue();
     for (const job of createdJobs) {
-      await bullQueue.add('batch', { jobId: job.id }, { jobId: job.id });
+      await bullQueue.add(job.type, {
+        jobId: job.id,
+        queueId: job.queue_id,
+        jobType: job.type,
+        payload: job.payload,
+      }, { jobId: job.id });
     }
     await bullQueue.close();
 
@@ -486,7 +495,7 @@ export async function retryJob(req: Request, res: Response, next: NextFunction) 
     await verifyJobAccess(jobId, userId);
 
     const { rows: [job] } = await pool.query(
-      `SELECT id, status, queue_id FROM jobs WHERE id = $1`,
+      `SELECT id, status, queue_id, type, payload FROM jobs WHERE id = $1`,
       [jobId],
     );
     if (!job) {
@@ -519,8 +528,13 @@ export async function retryJob(req: Request, res: Response, next: NextFunction) 
     );
 
     // Re-enqueue to BullMQ
-    const bullQueue = getBullQueue(job.queue_id);
-    await bullQueue.add('retry', { jobId }, { jobId });
+    const bullQueue = getBullQueue();
+    await bullQueue.add(job.type, {
+      jobId,
+      queueId: job.queue_id,
+      jobType: job.type,
+      payload: job.payload,
+    }, { jobId });
     await bullQueue.close();
 
     sendSuccess(res, updated);
