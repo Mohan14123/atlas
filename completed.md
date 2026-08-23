@@ -113,3 +113,17 @@
 - Clean `tsc` compilation
 
 **Files touched:** all files listed above + progress.json, completed.md
+
+---
+
+## 2026-08-23 — Phase 4 implemented (Queues API)
+
+**Phase 4 — Queues API (atlas-api)**
+
+- `server/src/api/controllers/queues.controller.ts` — CRUD operations for Queues, verifying org access per project
+- `server/src/api/routes/queues.routes.ts` — Queue routes using `mergeParams: true` (mounted under `/projects/:projectId/queues`)
+- Mounted `queues.routes.ts` in `projects.routes.ts`
+- Added Zod schemas for queue creation and updates (handling concurrency limits and paused states)
+- Clean `tsc` compilation
+
+**Files touched:** all files listed above + progress.json, completed.md
