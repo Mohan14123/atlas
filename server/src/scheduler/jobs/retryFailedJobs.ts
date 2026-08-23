@@ -10,12 +10,14 @@ export async function retryFailedJobs() {
     const { rows: failedJobs } = await pool.query<{
       id: string;
       queue_id: string;
+      type: string;
+      payload: any;
       attempt_count: number;
       strategy: string;
       initial_delay_ms: number;
       max_delay_ms: number;
     }>(`
-      SELECT j.id, j.queue_id, j.attempt_count, 
+      SELECT j.id, j.queue_id, j.type, j.payload, j.attempt_count, 
              rp.strategy, rp.initial_delay_ms, rp.max_delay_ms
       FROM jobs j
       JOIN queues q ON j.queue_id = q.id
@@ -57,8 +59,13 @@ export async function retryFailedJobs() {
 
       // Only enqueue if we actually updated the row AND it's going straight to QUEUED
       if (rowCount === 1 && nextStatus === 'QUEUED') {
-        const bullQueue = new BullQueue(`atlas_${job.queue_id}`, { connection: getRedis() });
-        await bullQueue.add('retry', { jobId: job.id }, { jobId: job.id });
+        const bullQueue = new BullQueue('atlas-jobs', { connection: getRedis() });
+        await bullQueue.add(job.type, {
+          jobId: job.id,
+          queueId: job.queue_id,
+          jobType: job.type,
+          payload: job.payload,
+        }, { jobId: job.id });
         await bullQueue.close();
       }
 
