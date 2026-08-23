@@ -293,3 +293,15 @@
 - Created `server/src/scheduler/jobs/createDueJobs.ts` establishing exactly-once schedule triggers utilizing PostgreSQL `FOR UPDATE` and idempotency constraints.
 - Created `server/src/scheduler/jobs/reconcile.ts` connecting the missing link of BullMQ failures by looking up job identifiers directly in Redis queues.
 - Wrote integration tests covering all scheduler functionality in `server/tests/scheduler/scheduler.test.ts`. All test suites successfully verified.
+
+## 2026-08-23 — Phase 11 Feedback Fixes
+- Updated `server/src/shared/lib/stateMachine.ts` to allow `CLAIMED` -> `QUEUED` and `RUNNING` -> `QUEUED` transitions for orphaned job recovery.
+- Updated `server/src/shared/db/queries/dlq.ts` to use `transitionJobStatus` instead of a direct `UPDATE`.
+- Updated `server/src/scheduler/jobs/recoverOrphanedJobs.ts` to use `transitionJobStatus`.
+- Updated `server/tests/api/dlq.test.ts` to transition the mocked job to `RUNNING` before `moveToDLQ` is tested.
+
+## 2026-08-23 — Phase 12: Docker & Compose
+- Created `server/Dockerfile.api` to build the API container.
+- Created `server/Dockerfile.scheduler` to build the Scheduler container.
+- Created `server/Dockerfile.worker` to build the Worker container.
+- Created `server/docker-compose.yml` defining the full multi-container architecture (postgres, redis, pgbouncer, api, scheduler, worker, and frontend).
