@@ -9,18 +9,16 @@ import { WorkerHeartbeat } from './heartbeat';
 
 export interface BullPayload {
   jobId: string;
-  queueId: string;
-  jobType: string;
-  payload: any;
 }
 
 export class AtlasWorker {
-  private bullWorker: BullWorker | null = null;
+  private workers: Map<string, BullWorker> = new Map();
   private readonly semaphore: Semaphore;
   private readonly registry: JobRegistry;
   private readonly heartbeat: WorkerHeartbeat;
   private activeJobsCount: number = 0;
   private isShuttingDown: boolean = false;
+  private queueCheckInterval: NodeJS.Timeout | null = null;
 
   constructor(
     concurrency: number,
@@ -40,40 +38,95 @@ export class AtlasWorker {
       throw new Error('Worker must be registered (heartbeat started) before starting consumption');
     }
 
-    this.bullWorker = new BullWorker('atlas-jobs', async (bullJob: BullJob) => {
-      // It's possible this was an old message in the queue that doesn't follow the new standard
+    // Initial sync
+    await this.syncQueues(workerId);
+
+    // Periodically check for new queues
+    this.queueCheckInterval = setInterval(() => {
+      this.syncQueues(workerId).catch((err) => {
+        logger.error('Failed to sync queues', { error: err.message, service: 'worker' });
+      });
+    }, 10000);
+
+    logger.info(`Atlas Worker started consuming from dynamically synced queues`, { service: 'worker' });
+  }
+
+  private async syncQueues(workerId: string): Promise<void> {
+    if (this.isShuttingDown) return;
+
+    const pool = getPool();
+    const { rows } = await pool.query<{ id: string }>('SELECT id FROM queues WHERE is_paused = false');
+    const currentQueueIds = new Set(rows.map(r => r.id));
+
+    // Start workers for new queues
+    for (const queueId of currentQueueIds) {
+      if (!this.workers.has(queueId)) {
+        this.startWorkerForQueue(queueId, workerId);
+      }
+    }
+
+    // Stop workers for deleted or paused queues
+    for (const [queueId, worker] of this.workers.entries()) {
+      if (!currentQueueIds.has(queueId)) {
+        this.workers.delete(queueId);
+        worker.close().catch(err => {
+          logger.error(`Error closing worker for queue ${queueId}`, { error: err.message });
+        });
+        logger.info(`Stopped consuming queue atlas_${queueId}`, { service: 'worker' });
+      }
+    }
+  }
+
+  private startWorkerForQueue(queueId: string, workerId: string) {
+    const queueName = `atlas_${queueId}`;
+    const worker = new BullWorker(queueName, async (bullJob: BullJob) => {
       const data = bullJob.data as BullPayload;
-      if (!data || !data.jobId || !data.jobType) {
+      if (!data || !data.jobId) {
         logger.warn('Skipping malformed BullMQ job', { service: 'worker', bullJobId: bullJob.id });
         return;
       }
 
-      await this.processJob(data.jobId, data.jobType, data.payload, workerId);
+      await this.processJob(data.jobId, workerId);
     }, {
       connection: getRedis(),
-      // Concurrency here is virtually infinite, we throttle via our Semaphore
       concurrency: 1000, 
       autorun: true,
     });
 
-    this.bullWorker.on('error', (err) => {
-      logger.error('BullMQ worker error', { error: err.message, service: 'worker' });
+    worker.on('error', (err) => {
+      logger.error(`BullMQ worker error for queue ${queueName}`, { error: err.message, service: 'worker' });
     });
 
-    logger.info(`Atlas Worker started consuming from atlas-jobs`, { service: 'worker' });
+    this.workers.set(queueId, worker);
+    logger.info(`Started consuming queue ${queueName}`, { service: 'worker' });
   }
 
-  private async processJob(jobId: string, jobType: string, payload: any, workerId: string): Promise<void> {
+  private async processJob(jobId: string, workerId: string): Promise<void> {
     if (this.isShuttingDown) {
       return;
     }
 
+    const pool = getPool();
+    // 1. Claim in Postgres (Idempotency check)
+    // claimSpecificJob fetches type and payload!
+    let claimedJob;
+    try {
+      claimedJob = await claimSpecificJob(pool, jobId, workerId);
+    } catch (err: any) {
+      logger.error(`Failed to claim job ${jobId}`, { error: err.message, service: 'worker' });
+      return;
+    }
+
+    if (!claimedJob) {
+      logger.debug(`Job ${jobId} could not be claimed by this worker. Skipping.`, { service: 'worker', job_id: jobId });
+      return;
+    }
+
+    const { type: jobType, payload } = claimedJob;
+
     const handler = this.registry.getHandler(jobType);
     if (!handler) {
       logger.error(`No handler registered for job type: ${jobType}`, { service: 'worker', job_id: jobId });
-      // We don't fail the job here immediately because it might be claimed by another worker that DOES have the handler
-      // We just don't process it. Another worker or a retry might pick it up if it fails eventually.
-      // But if we want to be strict, we could fail it. For now, skip.
       return;
     }
 
@@ -81,18 +134,7 @@ export class AtlasWorker {
     await this.semaphore.acquire();
     this.incrementActiveJobs();
 
-    const pool = getPool();
     try {
-      // 1. Claim in Postgres (Idempotency check)
-      const claimedJob = await claimSpecificJob(pool, jobId, workerId);
-      
-      if (!claimedJob) {
-        // Job was claimed by someone else, or already completed, or queue paused.
-        // We can safely ACK the BullMQ job by returning successfully.
-        logger.debug(`Job ${jobId} could not be claimed by this worker. Skipping.`, { service: 'worker', job_id: jobId });
-        return;
-      }
-
       // 2. Transition to RUNNING
       await transitionJobStatus(pool, jobId, 'CLAIMED', 'RUNNING', {
         started_at: new Date(),
@@ -146,9 +188,14 @@ export class AtlasWorker {
 
   async close(): Promise<void> {
     this.isShuttingDown = true;
-    if (this.bullWorker) {
-      await this.bullWorker.close();
-      logger.info('BullMQ worker closed', { service: 'worker' });
+    if (this.queueCheckInterval) {
+      clearInterval(this.queueCheckInterval);
     }
+    
+    const closePromises = Array.from(this.workers.values()).map(worker => worker.close());
+    await Promise.all(closePromises);
+    this.workers.clear();
+    
+    logger.info('BullMQ workers closed', { service: 'worker' });
   }
 }

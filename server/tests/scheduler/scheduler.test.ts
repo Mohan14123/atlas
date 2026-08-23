@@ -127,7 +127,7 @@ describe('Scheduler Integration Tests', () => {
 
     await reconcile();
 
-    const bullQueue = new BullQueue('atlas-jobs', { connection: getRedis() });
+    const bullQueue = new BullQueue(`atlas_${queueId}`, { connection: getRedis() });
     const bullJob = await bullQueue.getJob(jobId);
     expect(bullJob).toBeDefined();
     expect(bullJob?.id).toBe(jobId);

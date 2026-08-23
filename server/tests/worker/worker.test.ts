@@ -15,14 +15,8 @@ describe('Atlas Worker Service', () => {
 
   beforeAll(async () => {
     pool = getPool();
-    bullQueue = new BullQueue('atlas-jobs', { connection: getRedis() });
-
-    // Clear BullMQ
-    await bullQueue.drain();
   });
-
   afterAll(async () => {
-    await bullQueue.close();
     await pool.end();
   });
 
@@ -36,13 +30,7 @@ describe('Atlas Worker Service', () => {
       return { success: true };
     });
 
-    // 2. Setup Worker
-    heartbeat = new WorkerHeartbeat(1);
-    await heartbeat.start();
-    worker = new AtlasWorker(1, registry, heartbeat);
-    await worker.start();
-
-    // 3. Create a queue and a job in Postgres
+    // 2. Create a queue and a job in Postgres
     const { rows: orgRows } = await pool.query(`
       INSERT INTO organizations (id, name) VALUES (gen_random_uuid(), 'Test Org') RETURNING id
     `);
@@ -70,13 +58,16 @@ describe('Atlas Worker Service', () => {
     `, [queueId]);
     const jobId = jobRows[0].id;
 
+    // 3. Setup Worker
+    heartbeat = new WorkerHeartbeat(1);
+    await heartbeat.start();
+    worker = new AtlasWorker(1, registry, heartbeat);
+    await worker.start();
+
     // 4. Enqueue to BullMQ
-    await bullQueue.add('test-job', {
-      jobId,
-      queueId,
-      jobType: 'test-job',
-      payload: { foo: 'bar' },
-    }, { jobId });
+    bullQueue = new BullQueue(`atlas_${queueId}`, { connection: getRedis() });
+    await bullQueue.drain();
+    await bullQueue.add('test-job', { jobId }, { jobId });
 
     // 5. Wait for execution
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -87,6 +78,7 @@ describe('Atlas Worker Service', () => {
     const { rows: checkJob } = await pool.query(`SELECT status FROM jobs WHERE id = $1`, [jobId]);
     expect(checkJob[0].status).toBe('COMPLETED');
 
+    await bullQueue.close();
     await worker.close();
     await heartbeat.stop();
   });
