@@ -38,10 +38,10 @@ async function verifyDLQAccess(entryId: string, userId: string): Promise<void> {
 }
 
 /**
- * Returns a BullMQ Queue instance.
+ * Returns the global BullMQ Queue instance.
  */
-function getBullQueue(queueId: string): BullQueue {
-  return new BullQueue(`atlas_${queueId}`, { connection: getRedis() });
+function getBullQueue(): BullQueue {
+  return new BullQueue('atlas-jobs', { connection: getRedis() });
 }
 
 /**
@@ -188,15 +188,20 @@ export async function replayDLQ(req: Request, res: Response, next: NextFunction)
 
     const { newJobId } = await replayDLQEntry(pool, entryId);
 
-    // Fetch the newly created job
+    // Fetch the newly created job with full metadata for BullMQ
     const { rows: [newJob] } = await pool.query(
-      `SELECT id, status, created_at FROM jobs WHERE id = $1`,
+      `SELECT id, status, queue_id, type, payload, created_at FROM jobs WHERE id = $1`,
       [newJobId]
     );
 
     // Enqueue to BullMQ
-    const bullQueue = getBullQueue(entry.queue_id);
-    await bullQueue.add('dlq-replay', { jobId: newJobId }, { jobId: newJobId });
+    const bullQueue = getBullQueue();
+    await bullQueue.add(newJob.type, {
+      jobId: newJob.id,
+      queueId: newJob.queue_id,
+      jobType: newJob.type,
+      payload: newJob.payload,
+    }, { jobId: newJob.id });
     await bullQueue.close();
 
     sendSuccess(res, {
