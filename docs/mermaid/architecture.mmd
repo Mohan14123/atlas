@@ -1,18 +1,101 @@
-flowchart TD
-    Client["Client / User"] --> API["Atlas API (Node.js/Express)"]
-    API --> DB[(PostgreSQL)]
-    API --> Redis[(Redis)]
-    
-    Scheduler["Atlas Scheduler (Node.js)"] --> DB
-    Scheduler --> Redis
-    
-    Worker1["Atlas Worker 1 (Node.js)"] --> DB
-    Worker1 --> Redis
-    
-    WorkerN["Atlas Worker N (Node.js)"] --> DB
-    WorkerN --> Redis
-    
-    subgraph Infrastructure
-        DB
-        Redis
+flowchart TB
+    %% Core Architecture Grouping
+    subgraph ClientLayer["Client Layer"]
+        User["User"]
+        Frontend["Atlas Dashboard<br/>React + TypeScript"]
     end
+
+    subgraph ControlPlane["Atlas Control Plane"]
+        API["Atlas API<br/>Auth + Validation + Routing"]
+        Scheduler["Scheduler<br/>Timers + Retries + Recovery"]
+    end
+
+    subgraph ExecutionPlane["Atlas Execution Plane"]
+        direction LR
+        Redis["Redis / BullMQ<br/>Message Broker"]
+        W1["Worker 1"]
+        W2["Worker 2"]
+        WN["Worker N"]
+        Handlers["Handler / Plugin Registry"]
+    end
+
+    subgraph Persistence["Durable Persistence"]
+        direction LR
+        Pooler["PgBouncer<br/>Connection Pooler"]
+        PostgreSQL[("PostgreSQL<br/>Source of Truth")]
+        DLQ["Dead Letter Queue"]
+        Metrics["Metrics & Logs"]
+    end
+
+    %% Client Interactions
+    User --> Frontend
+    Frontend -->|REST / WS| API
+    Frontend -.->|Read| Metrics
+    Frontend -.->|Read| DLQ
+
+    %% Control Plane -> Persistence
+    API -->|Create/Update| Pooler
+    Scheduler -->|Read/Reconcile| Pooler
+    Pooler --> PostgreSQL
+    
+    PostgreSQL -.->|LISTEN/NOTIFY| Scheduler
+
+    %% Control Plane -> Execution
+    Scheduler -->|Enqueue| Redis
+
+    %% Execution Plane Internals
+    Redis -->|Deliver| W1
+    Redis -->|Deliver| W2
+    Redis -->|Deliver| WN
+    
+    W1 --> Handlers
+    W2 --> Handlers
+    WN --> Handlers
+
+    %% Execution -> Persistence
+    W1 -->|Claim/Persist| Pooler
+    W2 -->|Claim/Persist| Pooler
+    WN -->|Claim/Persist| Pooler
+
+    %% Worker Health Tracking
+    W1 -.->|Heartbeat| PostgreSQL
+    W2 -.->|Heartbeat| PostgreSQL
+    WN -.->|Heartbeat| PostgreSQL
+
+    %% Conceptual Job Flow (Isolated to prevent line tangling)
+    subgraph JobLifecycle["Job Lifecycle (Conceptual)"]
+        direction LR
+        ScheduleDef["Schedule"] --> JobInst["Job Instance"]
+        JobInst --> QueuedState["Queued"]
+        QueuedState --> ClaimedState["Claimed (Tx)"]
+        ClaimedState --> RunningState["Running"]
+        
+        RunningState --> CompletedState["Completed"]
+        RunningState --> FailedState["Failed"]
+        
+        FailedState --> RetryPol["Retry Policy"]
+        RetryPol -->|Retry| QueuedState
+        FailedState --> DLQState["DLQ"]
+    end
+
+    %% Link Concepts loosely to avoid crossing
+    Scheduler -.->|Manages| ScheduleDef
+    W1 -.->|Executes| RunningState
+    PostgreSQL -.->|Stores| JobLifecycle
+
+    %% Styling
+    classDef api fill:#1f2937,stroke:#60a5fa,color:#fff
+    classDef scheduler fill:#312e81,stroke:#a78bfa,color:#fff
+    classDef transport fill:#7c2d12,stroke:#fb923c,color:#fff
+    classDef worker fill:#14532d,stroke:#4ade80,color:#fff
+    classDef database fill:#0f172a,stroke:#38bdf8,color:#fff
+    classDef domain fill:#374151,stroke:#9ca3af,color:#fff
+    classDef failure fill:#7f1d1d,stroke:#f87171,color:#fff
+
+    class API,Frontend api
+    class Scheduler scheduler
+    class Redis transport
+    class W1,W2,WN,Handlers worker
+    class Pooler,PostgreSQL,Metrics database
+    class ScheduleDef,JobInst,QueuedState,ClaimedState,RunningState,CompletedState domain
+    class FailedState,RetryPol,DLQState,DLQ failure
