@@ -52,6 +52,7 @@ describe('DLQ API', () => {
 
     // 3. Move it to DLQ using the DB helper (simulating worker exhaustion)
     const pool = getPool();
+    await pool.query('UPDATE jobs SET status = $1 WHERE id = $2', ['RUNNING', jobId]);
     await moveToDLQ(pool, jobId, 'MAX_ATTEMPTS_EXCEEDED', 'Failed after 3 retries', 3);
 
     // Fetch the inserted DLQ entry ID
