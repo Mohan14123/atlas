@@ -250,3 +250,33 @@
 - `server/tests/api/dlq.test.ts` [NEW]
 - `progress.json` [MODIFIED]
 - `completed.md` [MODIFIED]
+
+---
+
+## 2026-08-23 — Phase 8 implemented (Workers & Metrics API)
+
+**Phase 8 — Workers & Metrics API (atlas-api) — 3 endpoints**
+
+- `server/src/api/controllers/workers.controller.ts` — Read-only API for workers:
+  - `GET /workers` — List workers with their current status and active job counts
+  - `GET /workers/:workerId` — Get single worker with recent heartbeats and running jobs
+- `server/src/api/controllers/metrics.controller.ts` — Dashboard API:
+  - `GET /metrics` — Calculate throughput, success/failure rates, queue depths, and worker utilization over rolling windows (1h, 24h, 7d)
+- `server/src/api/routes/workers.routes.ts` — Router for Workers API
+- `server/src/api/routes/metrics.routes.ts` — Router for Metrics API
+- `server/src/api/routes/index.ts` — Mounted both routers under `/workers` and `/metrics`
+- `server/tests/api/workers.test.ts` — Integration tests for workers API
+- `server/tests/api/metrics.test.ts` — Integration tests for metrics API
+- All 53 tests across 9 suites pass cleanly
+- `tsc --noEmit`: 0 errors
+
+**Files touched:**
+- `server/src/api/controllers/workers.controller.ts` [NEW]
+- `server/src/api/controllers/metrics.controller.ts` [NEW]
+- `server/src/api/routes/workers.routes.ts` [NEW]
+- `server/src/api/routes/metrics.routes.ts` [NEW]
+- `server/src/api/routes/index.ts` [MODIFIED]
+- `server/tests/api/workers.test.ts` [NEW]
+- `server/tests/api/metrics.test.ts` [NEW]
+- `progress.json` [MODIFIED]
+- `completed.md` [MODIFIED]
