@@ -311,3 +311,8 @@
 - Added per-tick timing logs to the Scheduler loop in `server/src/scheduler/scheduler.ts` to measure overhead and execution time.
 - Enhanced the Worker job processing logs in `server/src/worker/worker.ts` to track and log the execution duration for both successful and failed jobs.
 - The `GET /metrics` endpoint derives and delivers robust metrics directly from Postgres, as originally designed.
+
+## 2026-08-23 — Phase 14: Tests
+- Created `server/tests/concurrency/claimPath.test.ts` to verify exactly-once semantics for worker claims.
+- Verified integration tests for Idempotency, Batch, DLQ Replay, Pause/Resume, Stale Worker, and Job Lifecycle.
+- Total test count reached 62 passing tests, covering edge-case scenarios and Postgres transaction handling.
