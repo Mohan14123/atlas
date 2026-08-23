@@ -1,4 +1,5 @@
 import type { Pool } from 'pg';
+import { transitionJobStatus } from './jobs';
 
 export async function moveToDLQ(
   pool: Pool,
@@ -10,20 +11,7 @@ export async function moveToDLQ(
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    await client.query(`
-      WITH updated AS (
-        UPDATE jobs SET status = 'FAILED', updated_at = NOW() WHERE id = $1
-        RETURNING id
-      ),
-      log AS (
-        INSERT INTO job_logs (id, job_id, level, message)
-        SELECT gen_random_uuid(), id, 'INFO', 'Status transitioned to FAILED (DLQ)'
-        FROM updated
-        RETURNING id
-      )
-      SELECT pg_notify('job_updated', json_build_object('job_id', id, 'status', 'FAILED')::text)
-      FROM updated
-    `, [jobId]);
+    await transitionJobStatus(client, jobId, 'RUNNING', 'FAILED');
     await client.query(
       `INSERT INTO dead_letter_queue (id, job_id, reason, attempts, error_message, failed_at)
        VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW())
