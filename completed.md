@@ -49,3 +49,32 @@
 **Files touched:**
 - `docs/user/frontend_plan.md` [NEW]
 - `completed.md` [MODIFIED]
+
+---
+
+## 2026-08-23 — Phase 1 implemented + GitHub repo created
+
+**Phase 1 — Shared Foundation & Database Layer**
+
+- `server/src/shared/config/env.ts` — Zod-validated env loader, exits on missing vars
+- `server/src/shared/config/db.ts` — pg.Pool singleton (max 20 prod / 3 test), pool error logged
+- `server/src/shared/config/redis.ts` — ioredis singleton, maxRetriesPerRequest: null (BullMQ req)
+- `server/src/shared/lib/errors.ts` — AppError(message, code, httpStatus), HttpStatus constants
+- `server/src/shared/lib/logger.ts` — structured JSON logger, service tag injected per-process
+- `server/src/shared/lib/response.ts` — sendSuccess / sendError / sendPaginated (canonical shapes)
+- `server/src/shared/lib/stateMachine.ts` — ALLOWED_TRANSITIONS map + validateTransition()
+- `server/prisma/schema.prisma` — all 13 models, JobStatus enum, composite index (queue_id, status, available_at), index (worker_id, heartbeat_at)
+- `server/src/shared/db/queries/jobs.ts` — claimNextJob() FOR UPDATE SKIP LOCKED, transitionJobStatus()
+- `server/src/shared/db/queries/workers.ts` — registerWorker, upsertHeartbeat, findStaleWorkers, markWorkerUnhealthy
+- `server/src/shared/db/queries/schedules.ts` — findDueSchedules (cap 100/tick), updateNextRunAt
+- `server/src/shared/db/queries/dlq.ts` — moveToDLQ (transaction), replayDLQEntry (transaction)
+- `server/src/shared/db/queries/metrics.ts` — getJobCounts, getQueueDepths, getWorkerUtilization
+- `server/tsconfig.json` — updated (strict, ES2022, CommonJS)
+- `server/package.json` — added scripts (dev:api, dev:scheduler, dev:worker, migrate, test), cron-parser
+- Migration applied: `prisma/migrations/20260823114016_init/` against atlas_dev (legai_postgres:5432)
+- `tsc --noEmit`: 0 errors
+- docs/ cleared (planning docs removed before first commit)
+- `.gitignore`: node_modules, dist, .env, generated/, migrations/
+- GitHub repo: https://github.com/Mohan14123/atlas (public, committed + pushed)
+
+**Files touched:** all files listed above + .gitignore, progress.json, completed.md
