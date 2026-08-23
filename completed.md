@@ -78,3 +78,22 @@
 - GitHub repo: https://github.com/Mohan14123/atlas (public, committed + pushed)
 
 **Files touched:** all files listed above + .gitignore, progress.json, completed.md
+
+---
+
+## 2026-08-23 — Phase 2 implemented (Auth API)
+
+**Phase 2 — Auth API (atlas-api)**
+
+- `server/src/api/middlewares/error.ts` — Global Express error handler mapping AppError and ZodError to standard responses
+- `server/src/api/middlewares/validate.ts` — Zod validation middleware (Express 5 compatible)
+- `server/src/api/middlewares/auth.ts` — JWT verify middleware and Express Request augmentation
+- `server/src/api/controllers/auth.controller.ts` — Register (transaction: User + Org + OrgMember) and Login endpoints
+- `server/src/api/routes/auth.routes.ts` — Auth routing
+- `server/src/api/routes/index.ts` — Main v1 API router
+- `server/src/api/app.ts` — Express app factory with CORS, JSON body parser, and global error handler
+- `server/src/api/index.ts` — API entry point: server start, DB connect, graceful shutdown
+- Verified successful registration (transaction commit) and login (JWT generation) via `curl`
+- Fixed Zod dependency to `3.23.8` to match frontend plan and API stability
+
+**Files touched:** all files listed above + progress.json, completed.md
