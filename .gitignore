@@ -6,3 +6,4 @@ server/src/generated/
 server/prisma/migrations/
 *.log
 .DS_Store
+Codity.AI Tech Assignment.docx

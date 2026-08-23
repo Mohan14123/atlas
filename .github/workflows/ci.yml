@@ -50,11 +50,11 @@ jobs:
         working-directory: ./server
         run: npm ci
 
-      - name: Run Prisma migrations
+      - name: Prepare test database
         working-directory: ./server
         env:
           DATABASE_URL: postgresql://atlas_user:atlas_password@localhost:5432/atlas_test?schema=public
-        run: npm run migrate:prod
+        run: npx prisma db push
 
       - name: Run integration tests
         working-directory: ./server

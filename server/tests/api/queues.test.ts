@@ -21,6 +21,9 @@ describe('Queues API', () => {
         organization_name: 'Queue Test Org',
       });
     
+    expect(res.status).toBe(201);
+    expect(res.body.data).toHaveProperty('token');
+
     authToken = res.body.data.token;
     organizationId = res.body.data.organization.id;
 

@@ -19,6 +19,9 @@ describe('Organizations API', () => {
         organization_name: 'Initial Org',
       });
     
+    expect(res.status).toBe(201);
+    expect(res.body.data).toHaveProperty('token');
+
     authToken = res.body.data.token;
     organizationId = res.body.data.organization.id;
   });
