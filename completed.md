@@ -127,3 +127,22 @@
 - Clean `tsc` compilation
 
 **Files touched:** all files listed above + progress.json, completed.md
+
+---
+
+## 2026-08-23 — Doc Recovery, Type Safety & CI Fix
+
+- Recovered `docs/prompt.md`, `docs/features.md`, `docs/database.md`, `docs/api.md`, `docs/architecture.md`, `docs/SUBMISSION.md` from transcript logs
+- Excluded `docs/` in `.gitignore` (as requested: ignored, not deleted)
+- Added global Express type augmentation for `req.user` in `server/src/types/express.d.ts`
+- Refactored `server/src/api/middlewares/auth.ts` to use global type augmentation
+- Tested build to ensure clean compilation
+- Added `.github/workflows/ci.yml` using `npx prisma db push` (completed by previous agent)
+- Added integration tests for auth, orgs, projects, queues APIs (completed by previous agent)
+
+**Files touched:**
+- `.gitignore` [MODIFIED]
+- `server/src/types/express.d.ts` [NEW]
+- `server/src/api/middlewares/auth.ts` [MODIFIED]
+- `progress.json` [MODIFIED]
+- `completed.md` [MODIFIED]
