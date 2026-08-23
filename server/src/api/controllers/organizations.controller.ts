@@ -110,7 +110,7 @@ export async function updateOrganization(req: Request, res: Response, next: Next
     }
 
     const { rows: [org] } = await pool.query(
-      `UPDATE organizations SET name = $1, updated_at = NOW() WHERE id = $2 RETURNING id, name, updated_at`,
+      `UPDATE organizations SET name = $1 WHERE id = $2 RETURNING id, name, created_at`,
       [name, orgId]
     );
 

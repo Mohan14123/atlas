@@ -61,23 +61,37 @@ export async function createQueue(req: Request, res: Response, next: NextFunctio
   const projectId = req.params.projectId as string;
   const { name, concurrency_limit = 10, is_paused = false } = req.body;
   const pool = getPool();
+  const client = await pool.connect();
 
   try {
     await verifyProjectAccess(projectId, userId);
 
-    const { rows: [queue] } = await pool.query(
-      `INSERT INTO queues (id, project_id, name, concurrency_limit, is_paused, created_at)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW())
-       RETURNING id, project_id, name, concurrency_limit, is_paused, created_at`,
-      [projectId, name, concurrency_limit, is_paused]
+    await client.query('BEGIN');
+
+    // Create a default retry policy
+    const { rows: [retryPolicy] } = await client.query(
+      `INSERT INTO retry_policies (id, strategy, max_attempts, initial_delay_ms, max_delay_ms)
+       VALUES (gen_random_uuid(), 'exponential', 3, 1000, 60000)
+       RETURNING id`
     );
 
+    const { rows: [queue] } = await client.query(
+      `INSERT INTO queues (id, project_id, retry_policy_id, name, concurrency_limit, is_paused, created_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, NOW())
+       RETURNING id, project_id, name, concurrency_limit, is_paused, created_at`,
+      [projectId, retryPolicy.id, name, concurrency_limit, is_paused]
+    );
+
+    await client.query('COMMIT');
     sendSuccess(res, { queue }, HttpStatus.CREATED);
   } catch (err) {
+    await client.query('ROLLBACK');
     if ((err as any).code === '23505') { // unique_violation
       return next(new AppError('Queue name must be unique within the project', 'CONFLICT', HttpStatus.CONFLICT));
     }
     next(err);
+  } finally {
+    client.release();
   }
 }
 

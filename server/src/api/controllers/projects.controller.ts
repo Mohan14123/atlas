@@ -37,7 +37,7 @@ export async function listProjects(req: Request, res: Response, next: NextFuncti
     await verifyOrgAccess(orgId, userId);
 
     const { rows } = await pool.query(
-      `SELECT id, organization_id, name, created_at, updated_at
+      `SELECT id, organization_id, name, created_at
        FROM   projects
        WHERE  organization_id = $1
        ORDER  BY created_at DESC`,
@@ -60,9 +60,9 @@ export async function createProject(req: Request, res: Response, next: NextFunct
     await verifyOrgAccess(orgId, userId);
 
     const { rows: [project] } = await pool.query(
-      `INSERT INTO projects (id, organization_id, name, created_at, updated_at)
-       VALUES (gen_random_uuid(), $1, $2, NOW(), NOW())
-       RETURNING id, organization_id, name, created_at, updated_at`,
+      `INSERT INTO projects (id, organization_id, name, created_at)
+       VALUES (gen_random_uuid(), $1, $2, NOW())
+       RETURNING id, organization_id, name, created_at`,
       [orgId, name]
     );
 
@@ -85,7 +85,7 @@ export async function getProject(req: Request, res: Response, next: NextFunction
     await verifyOrgAccess(orgId, userId);
 
     const { rows: [project] } = await pool.query(
-      `SELECT id, organization_id, name, created_at, updated_at
+      `SELECT id, organization_id, name, created_at
        FROM   projects
        WHERE  organization_id = $1 AND id = $2`,
       [orgId, projectId]
@@ -113,9 +113,9 @@ export async function updateProject(req: Request, res: Response, next: NextFunct
 
     const { rows: [project] } = await pool.query(
       `UPDATE projects
-       SET    name = $1, updated_at = NOW()
+       SET    name = $1
        WHERE  organization_id = $2 AND id = $3
-       RETURNING id, organization_id, name, created_at, updated_at`,
+       RETURNING id, organization_id, name, created_at`,
       [name, orgId, projectId]
     );
 
