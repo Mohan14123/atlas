@@ -316,3 +316,15 @@
 - Created `server/tests/concurrency/claimPath.test.ts` to verify exactly-once semantics for worker claims.
 - Verified integration tests for Idempotency, Batch, DLQ Replay, Pause/Resume, Stale Worker, and Job Lifecycle.
 - Total test count reached 62 passing tests, covering edge-case scenarios and Postgres transaction handling.
+
+## 2026-08-23 — Phase 16: E2E Verification
+
+- Fixed TS compilation of express type extensions in docker for atlas-api
+- Added missing JWT_SECRET to worker and scheduler in docker-compose.yml
+- Updated verify-e2e.ts with nested route URLs and valid payloads
+- Verified full API -> Postgres -> BullMQ -> Worker E2E flow
+
+**Files touched:**
+- `server/tsconfig.json` [MODIFIED]
+- `server/docker-compose.yml` [MODIFIED]
+- `server/scripts/verify-e2e.ts` [MODIFIED]

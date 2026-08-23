@@ -1,5 +1,5 @@
 {
-  "current_task": "Phase 15: Bonus (WebSocket, rate limiting)",
+  "current_task": "Phase 16: Final hardening & docs",
   "completed_tasks": [
     "Planning: docs/user/phases.md, docs/user/detailed_api.md, docs/user/frontend_plan.md",
     "Phase 1: src/shared/config (env, db, redis), src/shared/lib (errors, logger, response, stateMachine), prisma/schema.prisma (13 models + migration), src/shared/db/queries (jobs, workers, schedules, dlq, metrics)",
@@ -18,11 +18,11 @@
     "Phase 11: State machine enforcement + NOTIFY wiring (including feedback)",
     "Phase 12: Docker & Compose",
     "Phase 13: Observability",
-    "Phase 14: Tests (concurrency + integration)"
+    "Phase 14: Tests (concurrency + integration)",
+    "Phase 15: Bonus (WebSocket, rate limiting)"
   ],
   "pending_tasks": [
-    "Phase 15: Bonus (WebSocket, rate limiting)",
     "Phase 16: Final hardening & docs"
   ],
-  "last_updated_timestamp": "2026-08-23T21:44:00.000Z"
+  "last_updated_timestamp": "2026-08-23T22:30:16.000Z"
 }
