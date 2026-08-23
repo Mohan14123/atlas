@@ -87,13 +87,8 @@ export async function createDueJobs() {
         // 7. Enqueue to BullMQ if job was actually inserted
         if (jobRows.length === 1) {
           const jobId = jobRows[0].id;
-          const bullQueue = new BullQueue('atlas-jobs', { connection: getRedis() });
-          await bullQueue.add(schedule.job_type, {
-            jobId,
-            queueId: schedule.queue_id,
-            jobType: schedule.job_type,
-            payload: schedule.job_payload,
-          }, { jobId });
+          const bullQueue = new BullQueue(`atlas_${schedule.queue_id}`, { connection: getRedis() });
+          await bullQueue.add(schedule.job_type, { jobId }, { jobId });
           await bullQueue.close();
 
           logger.info(`Generated job ${jobId} for schedule ${schedule.id}`, {

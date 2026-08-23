@@ -14,35 +14,36 @@ export async function reconcile() {
         AND updated_at < NOW() - interval '60 seconds'
     `);
 
+    const jobsByQueue: Record<string, typeof staleQueuedJobs> = {};
     for (const job of staleQueuedJobs) {
-      // 2. Double-check Postgres still says it's QUEUED (in case it just changed)
-      const { rows: currentJob } = await pool.query(`
-        SELECT status FROM jobs WHERE id = $1
-      `, [job.id]);
+      if (!jobsByQueue[job.queue_id]) jobsByQueue[job.queue_id] = [];
+      jobsByQueue[job.queue_id].push(job);
+    }
 
-      if (currentJob.length === 0 || currentJob[0].status !== 'QUEUED') {
-        continue;
+    for (const [queueId, queuedJobs] of Object.entries(jobsByQueue)) {
+      const bullQueue = new BullQueue(`atlas_${queueId}`, { connection: getRedis() });
+      try {
+        const waitingJobs = await bullQueue.getWaiting();
+        const waitingJobIds = new Set(waitingJobs.map((j) => j.id));
+
+        for (const job of queuedJobs) {
+          // Double-check Postgres still says it's QUEUED
+          const { rows: currentJob } = await pool.query(`
+            SELECT status FROM jobs WHERE id = $1
+          `, [job.id]);
+
+          if (currentJob.length === 0 || currentJob[0].status !== 'QUEUED') {
+            continue;
+          }
+
+          if (!waitingJobIds.has(job.id)) {
+            await bullQueue.add(job.type, { jobId: job.id }, { jobId: job.id });
+            logger.warn(`Reconciled missing BullMQ job ${job.id}`, { service: 'scheduler', job_id: job.id });
+          }
+        }
+      } finally {
+        await bullQueue.close();
       }
-
-      // 3. Check BullMQ for existence by job ID
-      const bullQueue = new BullQueue('atlas-jobs', { connection: getRedis() });
-      const bullJob = await bullQueue.getJob(job.id);
-
-      if (!bullJob) {
-        // 4. Missing from BullMQ! Re-enqueue it.
-        await bullQueue.add(job.type, {
-          jobId: job.id,
-          queueId: job.queue_id,
-          jobType: job.type,
-          payload: job.payload,
-        }, { jobId: job.id });
-        logger.warn(`Reconciled missing BullMQ job ${job.id}`, {
-          service: 'scheduler',
-          job_id: job.id,
-        });
-      }
-
-      await bullQueue.close();
     }
   } catch (err: any) {
     logger.error('Failed in reconcile', { error: err.message, service: 'scheduler' });
