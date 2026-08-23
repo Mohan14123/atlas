@@ -7,6 +7,4 @@ server/prisma/migrations/
 *.log
 .DS_Store
 Codity.AI Tech Assignment.docx
-docs/mermaid/
-docs/user/
-docs/assets/
+docs/
