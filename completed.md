@@ -97,3 +97,19 @@
 - Fixed Zod dependency to `3.23.8` to match frontend plan and API stability
 
 **Files touched:** all files listed above + progress.json, completed.md
+
+---
+
+## 2026-08-23 — Phase 3 implemented (Organizations & Projects API)
+
+**Phase 3 — Organizations & Projects (atlas-api)**
+
+- `server/src/api/controllers/organizations.controller.ts` — CRUD operations for Organizations, checking access via `organization_members`
+- `server/src/api/routes/organizations.routes.ts` — Organization routes, authenticated via `requireAuth`
+- `server/src/api/controllers/projects.controller.ts` — CRUD operations for Projects, verifying org access per user
+- `server/src/api/routes/projects.routes.ts` — Project routes using `mergeParams: true` (mounted under `/organizations/:orgId/projects`)
+- `server/src/api/routes/index.ts` — Mounted `organizations.routes.ts` at `/organizations`
+- Type fixes for `req.params` in Express 5 types for string indexing
+- Clean `tsc` compilation
+
+**Files touched:** all files listed above + progress.json, completed.md
