@@ -1,0 +1,69 @@
+flowchart TD
+    subgraph Clients["Clients"]
+        API_Client[API Client / User]
+    end
+
+    subgraph Atlas_API["Atlas REST API (Node.js)"]
+        Auth[Auth Middleware]
+        Controllers[API Controllers]
+        Auth --> Controllers
+    end
+
+    subgraph Database["Authoritative State (PostgreSQL)"]
+        Users[(Users/Orgs)]
+        Queues[(Queues & Limits)]
+        Jobs[(Jobs State Machine)]
+        Executions[(Job Executions)]
+        Schedules[(Schedules)]
+    end
+
+    subgraph Transport["Execution Transport (Redis)"]
+        BullMQ[(BullMQ: atlas_queueId)]
+    end
+
+    subgraph Atlas_Scheduler["Atlas Scheduler (Node.js)"]
+        Reconcile[Reconciliation]
+        Promote[Promote Delayed]
+        Retry[Retry Failed]
+        Stale[Stale Worker Recovery]
+        Cron[Evaluate Schedules]
+    end
+
+    subgraph Atlas_Worker["Atlas Worker (Node.js)"]
+        Manager[BullMQManager]
+        Claim[Atomic Claim]
+        Handler[Job Handlers]
+        Heartbeat[Heartbeat Emitter]
+    end
+
+    %% Client flows
+    API_Client -->|JWT Authenticated requests| Auth
+
+    %% API flows
+    Controllers -->|Read/Write configs & Enqueue Jobs| Database
+    Controllers -->|Enqueue jobId payload| Transport
+
+    %% Scheduler flows
+    Cron -->|Read schedules, Insert Jobs| Database
+    Cron -->|Enqueue jobId| Transport
+    Reconcile -->|Compare PG to Redis| Database
+    Reconcile -->|Re-enqueue missing jobs| Transport
+    Stale -->|Mark QUEUED| Database
+    Promote -->|Mark QUEUED| Database
+    Retry -->|Mark QUEUED| Database
+
+    %% Worker flows
+    Manager -->|Subscribe| Transport
+    Manager -->|Receive jobId| Claim
+    Claim -->|FOR UPDATE SKIP LOCKED| Database
+    Claim -->|Success: execute| Handler
+    Handler -->|Update status: COMPLETED/FAILED| Database
+    Heartbeat -->|Update last_heartbeat_at| Database
+
+    classDef db fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef service fill:#bbf,stroke:#333,stroke-width:2px;
+    classDef transport fill:#fbb,stroke:#333,stroke-width:2px;
+
+    class Database db;
+    class Transport transport;
+    class Atlas_API,Atlas_Scheduler,Atlas_Worker service;

@@ -1,0 +1,17 @@
+sequenceDiagram
+    participant Worker as Atlas Worker
+    participant API as Atlas API (Cron)
+    participant DB as PostgreSQL
+    
+    Worker->>API: POST /api/v1/workers/heartbeat (every 15s)
+    API->>DB: UPDATE worker_heartbeats SET heartbeat_at = NOW()
+    
+    Note over Worker: Worker crashes abruptly...
+    
+    loop Every 1 minute
+        API->>DB: SELECT * FROM workers WHERE heartbeat_at < NOW() - INTERVAL '60 seconds'
+        DB-->>API: returns stale workers
+        API->>DB: UPDATE workers SET status = 'offline' WHERE id IN (...)
+        API->>DB: UPDATE jobs SET status = 'QUEUED', worker_id = NULL WHERE worker_id IN (...) AND status = 'CLAIMED'
+        API->>DB: UPDATE job_executions SET status = 'FAILED', error_message = 'Worker crashed' WHERE ...
+    end

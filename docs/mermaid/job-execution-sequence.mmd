@@ -1,0 +1,32 @@
+sequenceDiagram
+    participant API as Atlas API
+    participant DB as PostgreSQL
+    participant Worker as Atlas Worker
+    
+    Worker->>API: POST /api/v1/queues/{queueId}/jobs/claim (long polling)
+    API->>DB: BEGIN
+    API->>DB: SELECT * FROM jobs WHERE status = 'QUEUED' AND available_at <= NOW() FOR UPDATE SKIP LOCKED LIMIT 1
+    DB-->>API: returns 1 job
+    API->>DB: UPDATE jobs SET status = 'CLAIMED', worker_id = $1
+    API->>DB: INSERT INTO job_executions (job_id, worker_id, status)
+    API->>DB: COMMIT
+    API-->>Worker: HTTP 200 { job }
+    
+    Worker->>Worker: Execute job logic
+    
+    alt Job Succeeds
+        Worker->>API: POST /api/v1/jobs/{jobId}/complete
+        API->>DB: UPDATE jobs SET status = 'COMPLETED'
+        API->>DB: UPDATE job_executions SET status = 'COMPLETED'
+        API-->>Worker: HTTP 200 OK
+    else Job Fails
+        Worker->>API: POST /api/v1/jobs/{jobId}/fail
+        API->>DB: Check retry policy
+        alt Retries Remaining
+            API->>DB: UPDATE jobs SET status = 'QUEUED', available_at = next_retry_time
+        else Retries Exhausted
+            API->>DB: UPDATE jobs SET status = 'FAILED'
+            API->>DB: INSERT INTO dead_letter_queue
+        end
+        API-->>Worker: HTTP 200 OK
+    end
