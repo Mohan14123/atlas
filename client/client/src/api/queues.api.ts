@@ -2,7 +2,7 @@ import { apiClient } from './client';
 import { APIResponse, PaginatedResponse, Queue, QueueStats } from '../types/api.types';
 
 export const queuesApi = {
-  list: async (orgId: string, projectId: string): Promise<PaginatedResponse<Queue>> => {
+  list: async (orgId: string, projectId: string): Promise<APIResponse<{ queues: Queue[] }>> => {
     const res = await apiClient.get(`/organizations/${orgId}/projects/${projectId}/queues`);
     return res.data;
   },

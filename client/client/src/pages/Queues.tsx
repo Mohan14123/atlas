@@ -20,7 +20,7 @@ export default function Queues() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {data?.data.map((queue) => (
+        {data?.data?.queues?.map((queue) => (
           <div key={queue.id} className="bg-[#18181b] border border-[#27272a] rounded-lg shadow-sm p-6 flex flex-col">
             <div className="flex justify-between items-start mb-4">
               <div>
