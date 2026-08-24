@@ -7,4 +7,14 @@ server/prisma/migrations/
 *.log
 .DS_Store
 Codity.AI Tech Assignment.docx
-docs/
+docs/*
+!docs/architecture.md
+!docs/architecture-diagram.*
+!docs/er-diagram.*
+!docs/api.md
+!docs/database.md
+!docs/design-decisions.md
+!docs/testing.md
+!docs/setup.md
+!docs/security.md
+!docs/submission-checklist.md
