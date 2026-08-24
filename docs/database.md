@@ -1,53 +1,61 @@
-# Database Design
+# Atlas Database Schema and Strategy
 
-This document explains why the database is designed the way it is.
+Atlas uses PostgreSQL as the absolute authoritative source of truth. The database is strictly normalized, enforces isolation through foreign keys, and leverages specific locking primitives for safe concurrent access.
 
-## jobs
+## Entity Responsibilities
 
-**Purpose:**
-Represents one logical job instance.
+- **User**: Represents a human or system identity.
+- **Organization**: Top-level tenant container.
+- **OrganizationMember**: Maps Users to Organizations.
+- **Project**: A logical grouping within an Organization.
+- **Queue**: Defines processing rules (concurrency, retry logic) for a specific workload.
+- **Job**: The authoritative state of a specific task.
+- **JobExecution**: A historical record of a single worker's attempt to process a Job.
+- **WorkerHeartbeat**: Tracks active worker processes for stale-worker detection.
+- **JobSchedule**: Defines recurring (cron) templates that generate Jobs.
+- **DlqEntry**: Stores poison-pill jobs that exceeded their `max_attempts`.
+- **JobLog**: Raw textual logs emitted during a job's execution.
 
-**Important fields:**
-- `status`: Tracks the lifecycle state of the job.
-- `priority`: Determines execution order within a queue.
-- `attempt_count`: Used to enforce retry policy limits.
-- `available_at`: When the job is eligible for claiming.
-- `worker_id`: Nullable; tracks which worker has claimed the job.
+## Concurrency and Locking Strategy
 
-**Indexes:**
-- `(queue_id, status, priority)`
-- `(queue_id, available_at)`
-- `(worker_id)`
+Atlas guarantees that multiple workers cannot execute the same job by using PostgreSQL's **row-level pessimistic locking**.
 
-**Why:**
-The worker claim query frequently searches for eligible jobs in a queue ordered by priority and availability time. Fast lookups are essential for throughput.
+### The Claim Query
+When a worker receives a `jobId` from BullMQ, it attempts to claim it in Postgres:
 
-## queues
+```sql
+UPDATE jobs
+SET status = 'CLAIMED', worker_id = $1, updated_at = NOW()
+WHERE id = (
+  SELECT id FROM jobs
+  WHERE id = $2 AND status = 'QUEUED'
+  FOR UPDATE SKIP LOCKED
+)
+AND (
+  SELECT count(*) FROM jobs 
+  WHERE queue_id = $3 AND status = 'RUNNING'
+) < $4
+RETURNING *;
+```
 
-**Purpose:**
-Provides logical partitioning of jobs and applies specific processing configurations.
+### Why this is safe:
+1. **`FOR UPDATE SKIP LOCKED`**: Obtains an exclusive write lock on the job row. If another worker is already evaluating this job, the DB instantly skips the row rather than blocking/deadlocking, resulting in a safe `null` claim.
+2. **State Gate (`status = 'QUEUED'`)**: Prevents TOCTOU bugs. The job can only be locked if it is strictly `QUEUED`.
+3. **Concurrency Gate (`count(*) < limit`)**: Enforces queue-level concurrency globally across all workers in a single atomic database operation. Postgres can safely determine claim permission because it holds the true state of every job across the distributed system.
 
-**Important fields:**
-- `concurrency_limit`: Controls how many jobs can run at once.
-- `retry_policy_id`: Defines the default retry behavior for jobs in this queue.
+## Performance and Indexing
 
-**Why:**
-Queues map business domains (e.g. "email-sending", "image-processing") to their respective compute resources.
+To support high-throughput operations, specific composite indexes are applied:
 
-## job_schedules
+1. **`jobs_queue_id_status_idx`**: 
+   Accelerates the concurrency check (`COUNT(*) WHERE queue_id = X AND status = Y`) and API listing queries.
+2. **`jobs_status_available_at_idx`**:
+   Accelerates the scheduler's `promoteDelayedJobs` query (`WHERE status = 'SCHEDULED' AND available_at <= NOW()`).
+3. **`worker_heartbeats_last_heartbeat_at_idx`**:
+   Accelerates the scheduler's `recoverOrphanedJobs` query to quickly identify stale workers.
 
-**Purpose:**
-Defines the pattern or time when jobs should be generated.
+## Normalization and Cascading
 
-**Important fields:**
-- `cron_expression`: e.g. `* * * * *`
-- `next_run_at`: Driven by cron logic or fixed delays.
-
-**Why:**
-Separating schedules from jobs allows us to maintain a clean history of generated `jobs` without losing the original recurrence definition.
-
-## Concurrency & Transactions
-
-- **SKIP LOCKED:** We heavily utilize PostgreSQL's `SELECT ... FOR UPDATE SKIP LOCKED` for atomic claiming. This guarantees that multiple concurrent workers never pick up the same job, and they do not block each other while searching the queue.
-- **Normalization:** Core entities (Users, Organizations, Projects) are heavily normalized. Job state is flattened to optimize for rapid polling and updates.
-- **Foreign Keys:** Cascading deletes are avoided in favor of explicit soft-deletion or controlled cleanup to prevent accidental bulk data loss in execution history.
+- **ON DELETE CASCADE**: Organizations cascading to Projects cascading to Queues cascading to Jobs. This ensures complete data cleanup when a tenant is deleted.
+- **Isolation**: Jobs are heavily isolated via `queue_id`, preventing a backlog in Queue A from impacting the lookup performance of Queue B (especially when partitioning is applied in the future).
+- **Execution History vs State**: The `jobs` table maintains the *current* authoritative state, while `job_executions` acts as an append-only ledger for attempts. This prevents row-bloat on the critical `jobs` table.
