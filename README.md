@@ -182,7 +182,7 @@ Atlas strictly defines the following guarantees:
 - **[API Documentation](docs/api.md)**
 - **[Design Decisions](docs/design-decisions.md)**
 - **[Database & Schema](docs/database.md)**
-- **[ER Diagram](docs/mermaid/er.mmd)**
+- **[ER Diagram](docs/er-diagram.mmd)**
 - **[Security](docs/security.md)**
 - **[Testing Strategy](docs/testing.md)**
 - **[Setup & Operations](docs/setup.md)**
