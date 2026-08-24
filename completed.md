@@ -328,3 +328,14 @@
 - `server/tsconfig.json` [MODIFIED]
 - `server/docker-compose.yml` [MODIFIED]
 - `server/scripts/verify-e2e.ts` [MODIFIED]
+
+## 2026-08-24 — Phase 16: Architecture Hardening & Docs
+
+- **State Machine Centralization:** Enforced all state transitions via `transitionJobStatusConditional`. Added `FAILED → SCHEDULED` and `CLAIMED → FAILED` paths. Refactored all scheduler jobs and APIs to use the centralized state machine, fixing TOCTOU vulnerabilities.
+- **BullMQ Lifecycle Manager:** Implemented `BullMQManager` with a shared Redis connection and cached Queue instances. Used it across all scheduler components, eliminating O(queues × ticks) Queue churn.
+- **Worker Hardening:** Worker now uses a dedicated Redis connection (separate from BullMQ internals) and sets `concurrency=1` per queue (making Postgres authoritative for concurrency limits). Worker writes/updates `job_executions` records. Fixed a sync bug that could cause duplicate Worker instances.
+- **Reconciliation Hardening:** Added batch limiting and wait/active checks before re-enqueuing.
+- **Scheduler Fixes:** Fixed promise leak in `requestImmediateTick()`.
+- **Integration Tests:** Added full test suites for `crash-recovery.test.ts`, `reconciliation.test.ts`, and `scheduler-hardening.test.ts`. 134 tests now pass cleanly.
+- **Docker Hardening:** Created `atlas-migrate` init container. Updated Compose to enforce DB migration before API/Worker/Scheduler startup. Copied `prisma.config.ts` into all images.
+- **Documentation:** Rewrote `docs/architecture.md` to formally document execution guarantees (at-least-once handler, exactly-once PG claim), state transitions, and failure recovery pipelines.
