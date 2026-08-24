@@ -1,48 +1,57 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queuesApi } from '../api/queues.api';
+import { useAppContext } from '../components/layout/AppContext';
 
-export function useQueues(projectId: string) {
+export function useQueues() {
+  const { orgId, projectId } = useAppContext();
   return useQuery({
-    queryKey: ['queues', projectId],
-    queryFn: () => queuesApi.list(projectId),
+    queryKey: ['queues', orgId, projectId],
+    queryFn: () => queuesApi.list(orgId!, projectId!),
+    enabled: !!orgId && !!projectId,
   });
 }
 
 export function useQueue(queueId: string) {
+  const { orgId, projectId } = useAppContext();
   return useQuery({
-    queryKey: ['queue', queueId],
-    queryFn: () => queuesApi.get(queueId),
+    queryKey: ['queue', orgId, projectId, queueId],
+    queryFn: () => queuesApi.get(orgId!, projectId!, queueId),
+    enabled: !!orgId && !!projectId && !!queueId,
   });
 }
 
 export function useQueueStats(queueId: string) {
+  const { orgId, projectId } = useAppContext();
   return useQuery({
-    queryKey: ['queue-stats', queueId],
-    queryFn: () => queuesApi.stats(queueId),
+    queryKey: ['queue-stats', orgId, projectId, queueId],
+    queryFn: () => queuesApi.stats(orgId!, projectId!, queueId),
     refetchInterval: 10000,
+    enabled: !!orgId && !!projectId && !!queueId,
   });
 }
 
 export function usePauseQueue() {
   const queryClient = useQueryClient();
+  const { orgId, projectId } = useAppContext();
   return useMutation({
-    mutationFn: queuesApi.pause,
+    mutationFn: (queueId: string) => queuesApi.pause(orgId!, projectId!, queueId),
     onSuccess: (_, queueId) => {
       queryClient.invalidateQueries({ queryKey: ['queues'] });
-      queryClient.invalidateQueries({ queryKey: ['queue', queueId] });
-      queryClient.invalidateQueries({ queryKey: ['queue-stats', queueId] });
+      queryClient.invalidateQueries({ queryKey: ['queue', orgId, projectId, queueId] });
+      queryClient.invalidateQueries({ queryKey: ['queue-stats', orgId, projectId, queueId] });
     }
   });
 }
 
 export function useResumeQueue() {
   const queryClient = useQueryClient();
+  const { orgId, projectId } = useAppContext();
   return useMutation({
-    mutationFn: queuesApi.resume,
+    mutationFn: (queueId: string) => queuesApi.resume(orgId!, projectId!, queueId),
     onSuccess: (_, queueId) => {
       queryClient.invalidateQueries({ queryKey: ['queues'] });
-      queryClient.invalidateQueries({ queryKey: ['queue', queueId] });
-      queryClient.invalidateQueries({ queryKey: ['queue-stats', queueId] });
+      queryClient.invalidateQueries({ queryKey: ['queue', orgId, projectId, queueId] });
+      queryClient.invalidateQueries({ queryKey: ['queue-stats', orgId, projectId, queueId] });
     }
   });
 }

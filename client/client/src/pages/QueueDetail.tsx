@@ -1,10 +1,11 @@
 import { useParams, Link, Outlet, NavLink } from 'react-router-dom';
 import { useQueue, useQueueStats } from '../hooks/useQueues';
 import { cn } from '../lib/utils';
-import { Card } from '../components/ui/Card';
+import { useAppContext } from '../components/layout/AppContext';
 
 export default function QueueDetail() {
   const { queueId } = useParams();
+  const { projectId } = useAppContext();
   const { data: queueData, isLoading: queueLoading } = useQueue(queueId!);
   const { data: statsData, isLoading: statsLoading } = useQueueStats(queueId!);
 
@@ -22,7 +23,7 @@ export default function QueueDetail() {
   return (
     <div className="space-y-6">
       <div>
-        <Link to="/projects/p-1/queues" className="text-sm text-indigo-400 hover:underline mb-2 inline-block">&larr; Back to Queues</Link>
+        <Link to={`/projects/${projectId}/queues`} className="text-sm text-indigo-400 hover:underline mb-2 inline-block">&larr; Back to Queues</Link>
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-[#fafafa]">{queue?.name}</h1>
         </div>

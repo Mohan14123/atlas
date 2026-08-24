@@ -4,7 +4,7 @@ import { metricsApi } from '../api/metrics.api';
 export function useMetrics(window: string = '1h') {
   return useQuery({
     queryKey: ['metrics', window],
-    queryFn: () => metricsApi.getMetrics(window),
+    queryFn: () => metricsApi.getSystemMetrics(window),
     refetchInterval: 10000,
   });
 }

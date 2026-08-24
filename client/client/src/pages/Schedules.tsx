@@ -7,8 +7,8 @@ import cronstrue from 'cronstrue';
 export default function Schedules() {
   const { queueId } = useParams();
   const { data, isLoading } = useSchedules(queueId!);
-  const toggle = useToggleSchedule();
-  const remove = useDeleteSchedule();
+  const toggle = useToggleSchedule(queueId!);
+  const remove = useDeleteSchedule(queueId!);
 
   if (isLoading) return <div>Loading schedules...</div>;
 

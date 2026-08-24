@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Play, Pause, Plus } from 'lucide-react';
 
 export default function Queues() {
-  const { data, isLoading } = useQueues('p-1');
+  const { data, isLoading } = useQueues();
   const pauseQueue = usePauseQueue();
   const resumeQueue = useResumeQueue();
 
