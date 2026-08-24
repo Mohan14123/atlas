@@ -1,6 +1,5 @@
-import { Queue as BullQueue } from 'bullmq';
 import { getPool } from '../../shared/config/db';
-import { getRedis } from '../../shared/config/redis';
+import { getBullMQManager } from '../../shared/lib/bullmq-manager';
 import { logger } from '../../shared/lib/logger';
 import { transitionJobStatus } from '../../shared/db/queries/jobs';
 import type { JobStatus } from '../../shared/lib/stateMachine';
@@ -33,9 +32,7 @@ export async function recoverOrphanedJobs() {
         if (is_unhealthy) {
           await transitionJobStatus(client, job.id, job.status, 'QUEUED', { worker_id: null });
           
-          const bullQueue = new BullQueue(`atlas_${job.queue_id}`, { connection: getRedis() });
-          await bullQueue.add(job.type, { jobId: job.id }, { jobId: job.id });
-          await bullQueue.close();
+          await getBullMQManager().enqueue(job.queue_id, job.type, job.id);
 
           logger.info(`Recovered orphaned job ${job.id} to QUEUED`, {
             service: 'scheduler',

@@ -1,6 +1,5 @@
-import { Queue as BullQueue } from 'bullmq';
 import { getPool } from '../../shared/config/db';
-import { getRedis } from '../../shared/config/redis';
+import { getBullMQManager } from '../../shared/lib/bullmq-manager';
 import { logger } from '../../shared/lib/logger';
 import { transitionJobStatusConditional } from '../../shared/db/queries/jobs';
 import type { JobStatus } from '../../shared/lib/stateMachine';
@@ -78,9 +77,7 @@ export async function retryFailedJobs() {
 
       // Only enqueue if transition succeeded AND job goes directly to QUEUED
       if (updated && nextStatus === 'QUEUED') {
-        const bullQueue = new BullQueue(`atlas_${updated.queue_id}`, { connection: getRedis() });
-        await bullQueue.add(updated.type, { jobId: updated.id }, { jobId: updated.id });
-        await bullQueue.close();
+        await getBullMQManager().enqueue(updated.queue_id, updated.type, updated.id);
       }
 
       if (updated) {

@@ -1,8 +1,7 @@
 import { getPool } from '../../shared/config/db';
-import { getRedis } from '../../shared/config/redis';
+import { getBullMQManager } from '../../shared/lib/bullmq-manager';
 import { logger } from '../../shared/lib/logger';
 import { transitionJobStatusConditional } from '../../shared/db/queries/jobs';
-import { Queue as BullQueue } from 'bullmq';
 
 /**
  * Promotes SCHEDULED jobs whose available_at has passed to QUEUED status.
@@ -33,9 +32,7 @@ export async function promoteDelayedJobs() {
 
       // Only enqueue if the transition actually happened (prevents duplicate enqueues)
       if (updated) {
-        const bullQueue = new BullQueue(`atlas_${updated.queue_id}`, { connection: getRedis() });
-        await bullQueue.add(updated.type, { jobId: updated.id }, { jobId: updated.id });
-        await bullQueue.close();
+        await getBullMQManager().enqueue(updated.queue_id, updated.type, updated.id);
 
         logger.info(`Promoted delayed job ${job.id} to QUEUED`, {
           service: 'scheduler',

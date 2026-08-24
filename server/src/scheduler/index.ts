@@ -1,5 +1,6 @@
 import { getPool, closePool } from '../shared/config/db';
 import { getRedis, closeRedis } from '../shared/config/redis';
+import { closeBullMQManager } from '../shared/lib/bullmq-manager';
 import { logger } from '../shared/lib/logger';
 import { SchedulerLoop } from './scheduler';
 import { ListenNotifyClient } from './listen-notify';
@@ -67,7 +68,10 @@ async function bootstrap() {
       // Ensure loop actually exited
       await loopPromise;
 
-      // 4. Close BullMQ/Redis resources
+      // 4. Close BullMQ queue cache
+      await closeBullMQManager();
+
+      // 5. Close Redis
       await closeRedis();
 
       // 5. Close PostgreSQL resources

@@ -1,6 +1,5 @@
-import { Queue as BullQueue } from 'bullmq';
 import { getPool } from '../../shared/config/db';
-import { getRedis } from '../../shared/config/redis';
+import { getBullMQManager } from '../../shared/lib/bullmq-manager';
 import { getNextRunAt } from '../../shared/lib/cron';
 import { findDueSchedules } from '../../shared/db/queries/schedules';
 import { logger } from '../../shared/lib/logger';
@@ -87,9 +86,7 @@ export async function createDueJobs() {
         // 7. Enqueue to BullMQ if job was actually inserted
         if (jobRows.length === 1) {
           const jobId = jobRows[0].id;
-          const bullQueue = new BullQueue(`atlas_${schedule.queue_id}`, { connection: getRedis() });
-          await bullQueue.add(schedule.job_type, { jobId }, { jobId });
-          await bullQueue.close();
+          await getBullMQManager().enqueue(schedule.queue_id, schedule.job_type, jobId);
 
           logger.info(`Generated job ${jobId} for schedule ${schedule.id}`, {
             service: 'scheduler',

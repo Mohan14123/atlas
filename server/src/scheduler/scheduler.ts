@@ -10,6 +10,7 @@ import { reconcile } from './jobs/reconcile';
 export class SchedulerLoop {
   private stopping = false;
   private currentTimeout: NodeJS.Timeout | null = null;
+  private sleepResolve: (() => void) | null = null;
   private activeTickPromise: Promise<void> | null = null;
   private intervalMs = env.SCHEDULER_INTERVAL_MS || 10000;
 
@@ -31,6 +32,7 @@ export class SchedulerLoop {
   /**
    * Request an immediate tick (e.g., from LISTEN/NOTIFY).
    * If a tick is already running, it will not start another one concurrently.
+   * Breaks the sleep by resolving the pending sleep promise.
    */
   requestImmediateTick() {
     if (!this.activeTickPromise && !this.stopping) {
@@ -38,7 +40,11 @@ export class SchedulerLoop {
         clearTimeout(this.currentTimeout);
         this.currentTimeout = null;
       }
-      // This will break the sleep and immediately continue the while loop
+      // Resolve the sleep promise to break out of the wait immediately
+      if (this.sleepResolve) {
+        this.sleepResolve();
+        this.sleepResolve = null;
+      }
     }
   }
 
@@ -81,8 +87,10 @@ export class SchedulerLoop {
 
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => {
+      this.sleepResolve = resolve;
       this.currentTimeout = setTimeout(() => {
         this.currentTimeout = null;
+        this.sleepResolve = null;
         resolve();
       }, ms);
     });
@@ -94,6 +102,11 @@ export class SchedulerLoop {
     if (this.currentTimeout) {
       clearTimeout(this.currentTimeout);
       this.currentTimeout = null;
+    }
+    // Break sleep if currently sleeping
+    if (this.sleepResolve) {
+      this.sleepResolve();
+      this.sleepResolve = null;
     }
     
     if (this.activeTickPromise) {
