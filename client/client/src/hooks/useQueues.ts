@@ -11,6 +11,18 @@ export function useQueues() {
   });
 }
 
+export function useCreateQueue() {
+  const queryClient = useQueryClient();
+  const { orgId, projectId } = useAppContext();
+  return useMutation({
+    mutationFn: (data: { name: string; concurrency_limit: number; priority?: number; retry_policy?: { strategy: string; max_attempts: number } }) => 
+      queuesApi.create(orgId!, projectId!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['queues', orgId, projectId] });
+    }
+  });
+}
+
 export function useQueue(queueId: string) {
   const { orgId, projectId } = useAppContext();
   return useQuery({

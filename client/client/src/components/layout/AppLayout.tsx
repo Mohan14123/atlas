@@ -4,7 +4,8 @@ import { Activity, LayoutDashboard, List, AlertTriangle, LogOut, ChevronDown } f
 import { cn } from '../../lib/utils';
 import { useAppContext } from './AppContext';
 import { useOrganizations } from '../../hooks/useOrganizations';
-import { useProjects } from '../../hooks/useProjects';
+import { useProjects, useCreateProject } from '../../hooks/useProjects';
+import { Plus } from 'lucide-react';
 
 export function Sidebar() {
   const { projectId } = useAppContext();
@@ -51,6 +52,7 @@ export function Topbar() {
   const { orgId, projectId, setOrgId, setProjectId } = useAppContext();
   const { data: orgData, isLoading: orgLoading } = useOrganizations();
   const { data: projData, isLoading: projLoading } = useProjects(orgId);
+  const { mutate: createProject, isPending: isCreatingProject } = useCreateProject();
 
   const orgs = orgData?.data.organizations || [];
   const projects = projData?.data.projects || [];
@@ -86,15 +88,38 @@ export function Topbar() {
             {projLoading ? (
               <span className="text-[#a1a1aa]">Loading...</span>
             ) : (
-              <select 
-                value={projectId || ''} 
-                onChange={(e) => setProjectId(e.target.value)}
-                className="bg-[#18181b] border border-[#27272a] rounded px-2 py-1 text-white focus:outline-none focus:border-indigo-500"
-                disabled={!orgId || projects.length === 0}
-              >
-                {projects.length === 0 && <option value="" disabled>No projects</option>}
-                {projects.map(proj => <option key={proj.id} value={proj.id}>{proj.name}</option>)}
-              </select>
+              <div className="flex items-center gap-1">
+                <select 
+                  value={projectId || ''} 
+                  onChange={(e) => setProjectId(e.target.value)}
+                  className="bg-[#18181b] border border-[#27272a] rounded px-2 py-1 text-white focus:outline-none focus:border-indigo-500"
+                  disabled={!orgId || projects.length === 0}
+                >
+                  {projects.length === 0 && <option value="" disabled>No projects</option>}
+                  {projects.map(proj => <option key={proj.id} value={proj.id}>{proj.name}</option>)}
+                </select>
+                {orgId && (
+                  <button 
+                    onClick={() => {
+                      const name = window.prompt("Enter new project name:");
+                      if (name && name.trim()) {
+                        createProject({ orgId, name: name.trim() }, {
+                          onSuccess: (data) => {
+                            if (data.data.project.id) {
+                              setProjectId(data.data.project.id);
+                            }
+                          }
+                        });
+                      }
+                    }}
+                    disabled={isCreatingProject}
+                    className="p-1 rounded bg-[#27272a] text-[#a1a1aa] hover:text-white hover:bg-[#3f3f46] transition-colors disabled:opacity-50"
+                    title="New Project"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>

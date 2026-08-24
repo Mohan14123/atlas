@@ -6,6 +6,10 @@ export const queuesApi = {
     const res = await apiClient.get(`/organizations/${orgId}/projects/${projectId}/queues`);
     return res.data;
   },
+  create: async (orgId: string, projectId: string, data: { name: string; concurrency_limit: number; priority?: number; retry_policy?: { strategy: string; max_attempts: number } }): Promise<APIResponse<{ queue: Queue }>> => {
+    const res = await apiClient.post(`/organizations/${orgId}/projects/${projectId}/queues`, data);
+    return res.data;
+  },
   get: async (orgId: string, projectId: string, queueId: string): Promise<APIResponse<Queue>> => {
     const res = await apiClient.get(`/organizations/${orgId}/projects/${projectId}/queues/${queueId}`);
     return res.data;
