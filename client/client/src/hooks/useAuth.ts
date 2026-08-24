@@ -10,6 +10,15 @@ export function useLogin() {
   });
 }
 
+export function useRegister() {
+  return useMutation({
+    mutationFn: authApi.register,
+    onSuccess: (res) => {
+      localStorage.setItem('atlas_token', res.data.token);
+    },
+  });
+}
+
 export function useLogout() {
   return () => {
     localStorage.removeItem('atlas_token');
