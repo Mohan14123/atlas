@@ -40,6 +40,17 @@ services:
     profiles:
       - pgbouncer
 
+  atlas-migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    command: npx prisma migrate deploy
+    environment:
+      - DATABASE_URL=postgresql://atlas:atlas_password@postgres:5432/atlas_db?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   atlas-api:
     build:
       context: .
@@ -56,6 +67,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      atlas-migrate:
+        condition: service_completed_successfully
 
   atlas-scheduler:
     build:
@@ -71,6 +84,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      atlas-migrate:
+        condition: service_completed_successfully
 
   atlas-worker:
     build:
@@ -87,16 +102,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      atlas-migrate:
+        condition: service_completed_successfully
 
-  atlas-frontend:
-    image: node:20-alpine
-    # Placeholder: frontend code not present yet.
-    # When available, you can add build context like:
-    # build:
-    #   context: ../client
-    working_dir: /app
-    command: sh -c "echo 'Frontend not yet implemented' && sleep infinity"
-    ports:
-      - "3000:3000"
-    depends_on:
-      - atlas-api
