@@ -37,12 +37,8 @@ async function verifyDLQAccess(entryId: string, userId: string): Promise<void> {
   }
 }
 
-/**
- * Returns the global BullMQ Queue instance.
- */
-function getBullQueue(): BullQueue {
-  return new BullQueue('atlas-jobs', { connection: getRedis() });
-}
+
+
 
 /**
  * GET /dlq

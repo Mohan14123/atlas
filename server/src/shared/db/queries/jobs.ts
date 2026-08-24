@@ -180,3 +180,62 @@ export async function transitionJobStatus(
     throw new Error(`Job ${jobId} not in expected status '${from}' — possible concurrent claim`);
   }
 }
+
+/**
+ * Atomically transition a single job identified by ID, enforcing a conditional
+ * WHERE clause beyond the `from` status check. Returns the updated row or null
+ * if no row matched (e.g. concurrent update). Unlike `transitionJobStatus`,
+ * this returns data instead of throwing on zero rows — callers can decide
+ * whether zero-match is an error or expected concurrency outcome.
+ *
+ * Validates the state machine, writes a transition log, and emits pg_notify.
+ */
+export async function transitionJobStatusConditional(
+  db: Queryable,
+  jobId: string,
+  from: JobStatus,
+  to: JobStatus,
+  patch: Partial<Record<string, unknown>> = {},
+  extraCondition?: string,
+  extraParams?: unknown[],
+): Promise<{ id: string; queue_id: string; type: string; payload: unknown } | null> {
+  validateTransition(from, to);
+
+  const sets = ['status = $2', 'updated_at = NOW()'];
+  const vals: unknown[] = [jobId, to];
+
+  for (const [col, val] of Object.entries(patch)) {
+    vals.push(val);
+    sets.push(`${col} = $${vals.length}`);
+  }
+
+  vals.push(from);
+  const fromIdx = vals.length;
+
+  let condition = `id = $1 AND status = $${fromIdx}`;
+  if (extraCondition && extraParams) {
+    for (const param of extraParams) {
+      vals.push(param);
+    }
+    condition += ` AND ${extraCondition}`;
+  }
+
+  const { rows } = await db.query<{ id: string; queue_id: string; type: string; payload: unknown }>(`
+    WITH updated AS (
+      UPDATE jobs SET ${sets.join(', ')} WHERE ${condition}
+      RETURNING id, queue_id, type, payload
+    ),
+    log AS (
+      INSERT INTO job_logs (id, job_id, level, message)
+      SELECT gen_random_uuid(), id, 'INFO', 'Status transitioned from ' || $${fromIdx} || ' to ' || $2
+      FROM updated
+      RETURNING id
+    )
+    SELECT u.id, u.queue_id, u.type, u.payload,
+           pg_notify('job_updated', json_build_object('job_id', u.id, 'status', $2)::text)
+    FROM updated u
+  `, vals);
+
+  return rows.length > 0 ? rows[0] : null;
+}
+

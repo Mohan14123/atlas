@@ -2,7 +2,21 @@ import { Queue as BullQueue } from 'bullmq';
 import { getPool } from '../../shared/config/db';
 import { getRedis } from '../../shared/config/redis';
 import { logger } from '../../shared/lib/logger';
+import { transitionJobStatusConditional } from '../../shared/db/queries/jobs';
+import type { JobStatus } from '../../shared/lib/stateMachine';
 
+/**
+ * Retries FAILED jobs that haven't exhausted their max_attempts.
+ * Uses the central state-machine transition to enforce invariants.
+ *
+ * Backoff strategy:
+ *   - fixed:       constant delay
+ *   - linear:      delay * retryNumber
+ *   - exponential: delay * 2^(retryNumber-1)
+ *
+ * If delay > 0 → FAILED→SCHEDULED (promoted to QUEUED by promoteDelayedJobs later).
+ * If delay = 0 → FAILED→QUEUED (immediately available).
+ */
 export async function retryFailedJobs() {
   const pool = getPool();
   try {
@@ -28,7 +42,7 @@ export async function retryFailedJobs() {
 
     for (const job of failedJobs) {
       let delayMs = 0;
-      // The attempt_count is how many times it has ACTUALLY executed.
+      // attempt_count reflects how many times the job has actually executed.
       // E.g., if attempt_count = 1, we are preparing the 2nd attempt.
       const retryNumber = Math.max(1, job.attempt_count);
 
@@ -40,43 +54,40 @@ export async function retryFailedJobs() {
         delayMs = job.initial_delay_ms * Math.pow(2, retryNumber - 1);
       }
       
-      // Cap the delay and add a small random jitter (0-10%)
+      // Cap the delay and add small random jitter (0-10%) to avoid thundering herd
       delayMs = Math.min(delayMs, job.max_delay_ms);
-      delayMs = delayMs + (delayMs * 0.1 * Math.random());
+      const JITTER_FACTOR = 0.1;
+      delayMs = delayMs + (delayMs * JITTER_FACTOR * Math.random());
 
-      const nextStatus = delayMs > 0 ? 'SCHEDULED' : 'QUEUED';
+      const nextStatus: JobStatus = delayMs > 0 ? 'SCHEDULED' : 'QUEUED';
       
-      // Idempotent conditional update
-      const { rowCount } = await pool.query(`
-        WITH updated AS (
-          UPDATE jobs
-          SET    status = $2, available_at = NOW() + ($3 || ' milliseconds')::interval, attempt_count = attempt_count + 1, updated_at = NOW()
-          WHERE  id = $1
-            AND  status = 'FAILED'
-            AND  attempt_count < max_attempts
-          RETURNING id
-        ),
-        log AS (
-          INSERT INTO job_logs (id, job_id, level, message)
-          SELECT gen_random_uuid(), id, 'INFO', 'Status transitioned from FAILED to ' || $2::text || ' (Retry Mechanism)'
-          FROM updated
-          RETURNING id
-        )
-        SELECT pg_notify('job_updated', json_build_object('job_id', u.id, 'status', $2)::text)
-        FROM updated u
-      `, [job.id, nextStatus, Math.round(delayMs)]);
+      // Atomic conditional transition via central state machine.
+      // Extra condition ensures we only retry if attempt_count < max_attempts
+      // at UPDATE time (guards against concurrent retry by another scheduler).
+      const updated = await transitionJobStatusConditional(
+        pool,
+        job.id,
+        'FAILED',
+        nextStatus,
+        {
+          available_at: new Date(Date.now() + Math.round(delayMs)),
+          attempt_count: job.attempt_count + 1,
+        },
+        'attempt_count < max_attempts',
+      );
 
-      // Only enqueue if we actually updated the row AND it's going straight to QUEUED
-      if (rowCount === 1 && nextStatus === 'QUEUED') {
-        const bullQueue = new BullQueue(`atlas_${job.queue_id}`, { connection: getRedis() });
-        await bullQueue.add(job.type, { jobId: job.id }, { jobId: job.id });
+      // Only enqueue if transition succeeded AND job goes directly to QUEUED
+      if (updated && nextStatus === 'QUEUED') {
+        const bullQueue = new BullQueue(`atlas_${updated.queue_id}`, { connection: getRedis() });
+        await bullQueue.add(updated.type, { jobId: updated.id }, { jobId: updated.id });
         await bullQueue.close();
       }
 
-      if (rowCount === 1) {
+      if (updated) {
         logger.info(`Retrying failed job ${job.id} (status: ${nextStatus}, delay: ${Math.round(delayMs)}ms)`, {
           service: 'scheduler',
           job_id: job.id,
+          queue_id: job.queue_id,
         });
       }
     }

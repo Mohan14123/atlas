@@ -7,9 +7,9 @@ export type JobStatus =
 const TRANSITIONS: Record<JobStatus, readonly JobStatus[]> = {
   SCHEDULED:  ['QUEUED',  'CANCELLED'],
   QUEUED:     ['CLAIMED', 'CANCELLED'],
-  CLAIMED:    ['RUNNING', 'QUEUED'],
+  CLAIMED:    ['RUNNING', 'QUEUED', 'FAILED'],
   RUNNING:    ['COMPLETED', 'FAILED', 'QUEUED'],
-  FAILED:     ['QUEUED'],           // scheduler retry path
+  FAILED:     ['QUEUED', 'SCHEDULED'],  // QUEUED = immediate retry, SCHEDULED = retry with backoff delay
   COMPLETED:  [],
   CANCELLED:  [],
 };

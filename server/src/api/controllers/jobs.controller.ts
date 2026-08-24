@@ -5,7 +5,7 @@ import { getPool } from '../../shared/config/db';
 import { getRedis } from '../../shared/config/redis';
 import { sendSuccess, sendPaginated } from '../../shared/lib/response';
 import { AppError, HttpStatus } from '../../shared/lib/errors';
-import { validateTransition } from '../../shared/lib/stateMachine';
+import { transitionJobStatusConditional } from '../../shared/db/queries/jobs';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -484,45 +484,38 @@ export async function retryJob(req: Request, res: Response, next: NextFunction) 
   try {
     await verifyJobAccess(jobId, userId);
 
-    const { rows: [job] } = await pool.query(
-      `SELECT id, status, queue_id, type, payload FROM jobs WHERE id = $1`,
-      [jobId],
+    // Atomic transition: FAILED→QUEUED with state machine enforcement.
+    // The conditional update re-checks status = 'FAILED' at UPDATE time,
+    // preventing TOCTOU races where another process retries the same job.
+    const updated = await transitionJobStatusConditional(
+      pool,
+      jobId,
+      'FAILED',
+      'QUEUED',
+      {
+        attempt_count: 0,
+        available_at: new Date(),
+        worker_id: null,
+        claimed_at: null,
+        started_at: null,
+        completed_at: null,
+      },
     );
-    if (!job) {
-      throw new AppError('Job not found', 'NOT_FOUND', HttpStatus.NOT_FOUND);
+
+    if (!updated) {
+      throw new AppError(
+        'Job not found or not in FAILED state',
+        'INVALID_STATE_TRANSITION',
+        HttpStatus.UNPROCESSABLE,
+      );
     }
 
-    // Enforce state machine — only FAILED can be retried
-    validateTransition(job.status, 'QUEUED');
-
-    const { rows: [updated] } = await pool.query(
-      `UPDATE jobs
-       SET    status = 'QUEUED'::"JobStatus",
-              attempt_count = 0,
-              available_at = NOW(),
-              worker_id = NULL,
-              claimed_at = NULL,
-              started_at = NULL,
-              completed_at = NULL,
-              updated_at = NOW()
-       WHERE  id = $1
-       RETURNING id, status, attempt_count, updated_at`,
-      [jobId],
-    );
-
-    // Log the retry event
-    await pool.query(
-      `INSERT INTO job_logs (id, job_id, level, message, created_at)
-       VALUES (gen_random_uuid(), $1, 'INFO', 'Job manually retried — re-queued', NOW())`,
-      [jobId],
-    );
-
     // Re-enqueue to BullMQ
-    const bullQueue = getBullQueue(job.queue_id);
-    await bullQueue.add(job.type, { jobId }, { jobId });
+    const bullQueue = getBullQueue(updated.queue_id);
+    await bullQueue.add(updated.type, { jobId }, { jobId });
     await bullQueue.close();
 
-    sendSuccess(res, updated);
+    sendSuccess(res, { id: updated.id, status: 'QUEUED' });
   } catch (err) {
     next(err);
   }
@@ -542,6 +535,7 @@ export async function cancelJob(req: Request, res: Response, next: NextFunction)
   try {
     await verifyJobAccess(jobId, userId);
 
+    // Determine current status to know which transition to attempt.
     const { rows: [job] } = await pool.query(
       `SELECT id, status FROM jobs WHERE id = $1`,
       [jobId],
@@ -550,26 +544,24 @@ export async function cancelJob(req: Request, res: Response, next: NextFunction)
       throw new AppError('Job not found', 'NOT_FOUND', HttpStatus.NOT_FOUND);
     }
 
-    // Enforce state machine — only SCHEDULED or QUEUED can be cancelled
-    validateTransition(job.status, 'CANCELLED');
-
-    const { rows: [updated] } = await pool.query(
-      `UPDATE jobs
-       SET    status = 'CANCELLED'::"JobStatus",
-              updated_at = NOW()
-       WHERE  id = $1
-       RETURNING id, status, updated_at`,
-      [jobId],
+    // State machine allows: SCHEDULED→CANCELLED, QUEUED→CANCELLED
+    // The atomic transition re-checks the status at UPDATE time.
+    const updated = await transitionJobStatusConditional(
+      pool,
+      jobId,
+      job.status,
+      'CANCELLED',
     );
 
-    // Log the cancel event
-    await pool.query(
-      `INSERT INTO job_logs (id, job_id, level, message, created_at)
-       VALUES (gen_random_uuid(), $1, 'INFO', 'Job cancelled by user', NOW())`,
-      [jobId],
-    );
+    if (!updated) {
+      throw new AppError(
+        'Job not in a cancellable state (must be SCHEDULED or QUEUED)',
+        'INVALID_STATE_TRANSITION',
+        HttpStatus.UNPROCESSABLE,
+      );
+    }
 
-    sendSuccess(res, updated);
+    sendSuccess(res, { id: updated.id, status: 'CANCELLED' });
   } catch (err) {
     next(err);
   }
