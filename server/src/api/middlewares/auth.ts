@@ -12,7 +12,7 @@ export interface AuthUser {
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) {
-    throw new AppError('Authentication required', 'UNAUTHORIZED', HttpStatus.UNAUTHORIZED);
+    return next(new AppError('Authentication required', 'UNAUTHORIZED', HttpStatus.UNAUTHORIZED));
   }
 
   const token = authHeader.split(' ')[1];
@@ -21,6 +21,6 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     req.user = decoded;
     next();
   } catch (err) {
-    throw new AppError('Invalid or expired token', 'UNAUTHORIZED', HttpStatus.UNAUTHORIZED);
+    next(new AppError('Invalid or expired token', 'UNAUTHORIZED', HttpStatus.UNAUTHORIZED));
   }
 }

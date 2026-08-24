@@ -60,6 +60,13 @@ export async function register(req: Request, res: Response, next: NextFunction) 
       [org.id, user.id]
     );
 
+    // 5. Insert Default Project for the Organization
+    await client.query(
+      `INSERT INTO projects (id, organization_id, name, created_at)
+       VALUES (gen_random_uuid(), $1, 'Default Project', NOW())`,
+      [org.id]
+    );
+
     await client.query('COMMIT');
 
     // 5. Sign JWT and return

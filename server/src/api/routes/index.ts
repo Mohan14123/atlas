@@ -15,8 +15,11 @@ import {
 
 const router = Router();
 
+// Public routes
 router.use('/auth', authRoutes);
-router.use('/organizations', organizationsRoutes);
+
+// Protected routes — apply requireAuth first, then mount sub-routers
+router.use('/organizations', requireAuth, organizationsRoutes);
 router.use('/dlq', requireAuth, dlqRoutes);
 router.use('/workers', requireAuth, workersRoutes);
 router.use('/metrics', requireAuth, metricsRoutes);
