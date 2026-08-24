@@ -339,3 +339,42 @@
 - **Integration Tests:** Added full test suites for `crash-recovery.test.ts`, `reconciliation.test.ts`, and `scheduler-hardening.test.ts`. 134 tests now pass cleanly.
 - **Docker Hardening:** Created `atlas-migrate` init container. Updated Compose to enforce DB migration before API/Worker/Scheduler startup. Copied `prisma.config.ts` into all images.
 - **Documentation:** Rewrote `docs/architecture.md` to formally document execution guarantees (at-least-once handler, exactly-once PG claim), state transitions, and failure recovery pipelines.
+
+## 2026-08-24 — Frontend-Backend Integration
+
+- **AppContext:** Created `client/client/src/components/layout/AppContext.tsx` — React Context managing `orgId` and `projectId` with localStorage persistence and auto-selection logic.
+- **Org/Project Selectors:** Updated `AppLayout.tsx` Topbar with Organization and Project dropdown selectors fetching from real backend endpoints.
+- **API Client Cleanup:** Removed all `MOCK_ENABLED` toggles and hardcoded mock data arrays from `auth.api.ts`, `queues.api.ts`, `jobs.api.ts`, `schedules.api.ts`, `workers.api.ts`, `dlq.api.ts`, and `metrics.api.ts`.
+- **Route Wiring:** Updated all API clients to use the correct hierarchical routes (`/organizations/:orgId/projects/:projectId/queues/...`).
+- **Hook Updates:** Refactored `useQueues`, `useJobs`, `useSchedules`, `useMetrics` hooks to consume `orgId`/`projectId` from `useAppContext()`.
+- **Hardcoded ID Removal:** Eliminated `p-1` from `Queues.tsx`, `QueueDetail.tsx`, and `AppLayout.tsx` Sidebar.
+- **New Files:** `organizations.api.ts`, `projects.api.ts`, `useOrganizations.ts`, `useProjects.ts`.
+- **Dependencies:** Ran `npm install` to generate `package-lock.json` and install all client dependencies.
+- **Import Fix:** Corrected `AppContext.tsx` import paths (`../../hooks/` not `../hooks/`).
+- **Verification:** `tsc --noEmit` passes with zero errors.
+
+**Files touched:**
+- `client/client/src/App.tsx` [MODIFIED]
+- `client/client/src/components/layout/AppContext.tsx` [NEW]
+- `client/client/src/components/layout/AppLayout.tsx` [MODIFIED]
+- `client/client/src/api/auth.api.ts` [MODIFIED]
+- `client/client/src/api/queues.api.ts` [MODIFIED]
+- `client/client/src/api/jobs.api.ts` [MODIFIED]
+- `client/client/src/api/schedules.api.ts` [MODIFIED]
+- `client/client/src/api/workers.api.ts` [MODIFIED]
+- `client/client/src/api/dlq.api.ts` [MODIFIED]
+- `client/client/src/api/metrics.api.ts` [MODIFIED]
+- `client/client/src/api/organizations.api.ts` [NEW]
+- `client/client/src/api/projects.api.ts` [NEW]
+- `client/client/src/hooks/useQueues.ts` [MODIFIED]
+- `client/client/src/hooks/useJobs.ts` [MODIFIED]
+- `client/client/src/hooks/useSchedules.ts` [MODIFIED]
+- `client/client/src/hooks/useMetrics.ts` [MODIFIED]
+- `client/client/src/hooks/useOrganizations.ts` [NEW]
+- `client/client/src/hooks/useProjects.ts` [NEW]
+- `client/client/src/pages/Queues.tsx` [MODIFIED]
+- `client/client/src/pages/QueueDetail.tsx` [MODIFIED]
+- `client/client/src/pages/Schedules.tsx` [MODIFIED]
+- `client/client/package-lock.json` [NEW]
+- `progress.json` [MODIFIED]
+- `completed.md` [MODIFIED]

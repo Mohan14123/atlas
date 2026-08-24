@@ -1,5 +1,5 @@
 {
-  "current_task": "Phase 16: Final hardening & docs",
+  "current_task": "Complete",
   "completed_tasks": [
     "Planning: docs/user/phases.md, docs/user/detailed_api.md, docs/user/frontend_plan.md",
     "Phase 1: src/shared/config (env, db, redis), src/shared/lib (errors, logger, response, stateMachine), prisma/schema.prisma (13 models + migration), src/shared/db/queries (jobs, workers, schedules, dlq, metrics)",
@@ -20,8 +20,9 @@
     "Phase 13: Observability",
     "Phase 14: Tests (concurrency + integration)",
     "Phase 15: Bonus (WebSocket, rate limiting)",
-    "Phase 16: Final hardening & docs (Architecture hardening audit and fixes complete)"
+    "Phase 16: Final hardening & docs (Architecture hardening audit and fixes complete)",
+    "Frontend-Backend Integration: AppContext, org/project selectors, mock removal, hook wiring, npm install, tsc clean"
   ],
   "pending_tasks": [],
-  "last_updated_timestamp": "2026-08-24T07:55:00.000Z"
+  "last_updated_timestamp": "2026-08-24T09:56:00.000Z"
 }
