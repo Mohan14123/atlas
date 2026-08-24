@@ -43,10 +43,18 @@ export async function listQueues(req: Request, res: Response, next: NextFunction
     await verifyProjectAccess(projectId, userId);
 
     const { rows } = await pool.query(
-      `SELECT id, project_id, name, concurrency_limit, is_paused, created_at
-       FROM   queues
-       WHERE  project_id = $1
-       ORDER  BY created_at DESC`,
+      `SELECT q.id, q.project_id, q.name, q.priority, q.concurrency_limit, q.is_paused, q.created_at,
+              json_build_object(
+                'id', r.id,
+                'strategy', r.strategy,
+                'max_attempts', r.max_attempts,
+                'initial_delay_ms', r.initial_delay_ms,
+                'max_delay_ms', r.max_delay_ms
+              ) as retry_policy
+       FROM   queues q
+       JOIN   retry_policies r ON q.retry_policy_id = r.id
+       WHERE  q.project_id = $1
+       ORDER  BY q.created_at DESC`,
       [projectId]
     );
 
@@ -59,7 +67,9 @@ export async function listQueues(req: Request, res: Response, next: NextFunction
 export async function createQueue(req: Request, res: Response, next: NextFunction) {
   const userId = req.user!.id;
   const projectId = req.params.projectId as string;
-  const { name, concurrency_limit = 10, is_paused = false } = req.body;
+  const { name, concurrency_limit = 10, priority = 5, is_paused = false, retry_policy } = req.body;
+  const strategy = retry_policy?.strategy || 'exponential';
+  const max_attempts = retry_policy?.max_attempts || 3;
   const pool = getPool();
   const client = await pool.connect();
 
@@ -68,19 +78,29 @@ export async function createQueue(req: Request, res: Response, next: NextFunctio
 
     await client.query('BEGIN');
 
-    // Create a default retry policy
+    // Create a retry policy
     const { rows: [retryPolicy] } = await client.query(
       `INSERT INTO retry_policies (id, strategy, max_attempts, initial_delay_ms, max_delay_ms)
-       VALUES (gen_random_uuid(), 'exponential', 3, 1000, 60000)
-       RETURNING id`
+       VALUES (gen_random_uuid(), $1, $2, 1000, 60000)
+       RETURNING id`,
+      [strategy, max_attempts]
     );
 
     const { rows: [queue] } = await client.query(
-      `INSERT INTO queues (id, project_id, retry_policy_id, name, concurrency_limit, is_paused, created_at)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, NOW())
-       RETURNING id, project_id, name, concurrency_limit, is_paused, created_at`,
-      [projectId, retryPolicy.id, name, concurrency_limit, is_paused]
+      `INSERT INTO queues (id, project_id, retry_policy_id, name, priority, concurrency_limit, is_paused, created_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, NOW())
+       RETURNING id, project_id, name, priority, concurrency_limit, is_paused, created_at`,
+      [projectId, retryPolicy.id, name, priority, concurrency_limit, is_paused]
     );
+
+    // Attach retry policy to returned object so frontend has it immediately
+    queue.retry_policy = {
+      id: retryPolicy.id,
+      strategy,
+      max_attempts,
+      initial_delay_ms: 1000,
+      max_delay_ms: 60000
+    };
 
     await client.query('COMMIT');
     sendSuccess(res, { queue }, HttpStatus.CREATED);
@@ -105,9 +125,17 @@ export async function getQueue(req: Request, res: Response, next: NextFunction) 
     await verifyProjectAccess(projectId, userId);
 
     const { rows: [queue] } = await pool.query(
-      `SELECT id, project_id, name, concurrency_limit, is_paused, created_at
-       FROM   queues
-       WHERE  project_id = $1 AND id = $2`,
+      `SELECT q.id, q.project_id, q.name, q.priority, q.concurrency_limit, q.is_paused, q.created_at,
+              json_build_object(
+                'id', r.id,
+                'strategy', r.strategy,
+                'max_attempts', r.max_attempts,
+                'initial_delay_ms', r.initial_delay_ms,
+                'max_delay_ms', r.max_delay_ms
+              ) as retry_policy
+       FROM   queues q
+       JOIN   retry_policies r ON q.retry_policy_id = r.id
+       WHERE  q.project_id = $1 AND q.id = $2`,
       [projectId, queueId]
     );
 
