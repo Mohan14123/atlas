@@ -97,7 +97,6 @@ export async function claimSpecificJob(
       JOIN   queues q ON q.id = j.queue_id
       WHERE  j.id            = $1
         AND  j.status        = 'QUEUED'
-        AND  j.available_at <= NOW()
         AND  q.is_paused     = false
         AND (
           SELECT COUNT(*) FROM jobs
