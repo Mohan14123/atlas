@@ -6,6 +6,10 @@ export const jobsApi = {
     const res = await apiClient.get(`/organizations/${orgId}/projects/${projectId}/queues/${queueId}/jobs`, { params: filters });
     return res.data;
   },
+  create: async (orgId: string, projectId: string, queueId: string, data: any): Promise<APIResponse<Job>> => {
+    const res = await apiClient.post(`/organizations/${orgId}/projects/${projectId}/queues/${queueId}/jobs`, data);
+    return res.data;
+  },
   get: async (jobId: string): Promise<APIResponse<Job>> => {
     const res = await apiClient.get(`/jobs/${jobId}`);
     return res.data;

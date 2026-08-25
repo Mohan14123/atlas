@@ -5,6 +5,6 @@ export function useMetrics(window: string = '1h') {
   return useQuery({
     queryKey: ['metrics', window],
     queryFn: () => metricsApi.getSystemMetrics(window),
-    refetchInterval: 10000,
+    refetchInterval: 5000,
   });
 }

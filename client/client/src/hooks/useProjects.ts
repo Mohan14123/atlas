@@ -6,6 +6,7 @@ export function useProjects(orgId: string | null) {
     queryKey: ['projects', orgId],
     queryFn: () => projectsApi.list(orgId!),
     enabled: !!orgId,
+    refetchInterval: 5000
   });
 }
 

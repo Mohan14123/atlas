@@ -8,6 +8,7 @@ export function useQueues() {
     queryKey: ['queues', orgId, projectId],
     queryFn: () => queuesApi.list(orgId!, projectId!),
     enabled: !!orgId && !!projectId,
+    refetchInterval: 5000
   });
 }
 
@@ -29,6 +30,7 @@ export function useQueue(queueId: string) {
     queryKey: ['queue', orgId, projectId, queueId],
     queryFn: () => queuesApi.get(orgId!, projectId!, queueId),
     enabled: !!orgId && !!projectId && !!queueId,
+    refetchInterval: 5000
   });
 }
 
@@ -37,7 +39,7 @@ export function useQueueStats(queueId: string) {
   return useQuery({
     queryKey: ['queue-stats', orgId, projectId, queueId],
     queryFn: () => queuesApi.stats(orgId!, projectId!, queueId),
-    refetchInterval: 10000,
+    refetchInterval: 5000,
     enabled: !!orgId && !!projectId && !!queueId,
   });
 }

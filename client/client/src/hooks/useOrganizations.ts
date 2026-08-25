@@ -5,5 +5,6 @@ export function useOrganizations() {
   return useQuery({
     queryKey: ['organizations'],
     queryFn: () => organizationsApi.list(),
+    refetchInterval: 5000
   });
 }

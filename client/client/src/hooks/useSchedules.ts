@@ -8,6 +8,7 @@ export function useSchedules(queueId: string) {
     queryKey: ['schedules', orgId, projectId, queueId],
     queryFn: () => schedulesApi.list(orgId!, projectId!, queueId),
     enabled: !!orgId && !!projectId && !!queueId,
+    refetchInterval: 5000
   });
 }
 

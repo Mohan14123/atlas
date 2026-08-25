@@ -48,6 +48,22 @@ export async function getMetrics(req: Request, res: Response, next: NextFunction
     const failureRate = totalWindow > 0 ? (failedWindow / totalWindow) : 0;
     const retryRate = totalWindow > 0 ? (totalRetries / totalWindow) : 0;
 
+    // Throughput history (last 60 mins, 10 min buckets)
+    const { rows: throughputRows } = await pool.query(
+      `SELECT
+         to_char(bucket, 'HH24:MI') as time,
+         COUNT(jobs.id)::int as count
+       FROM generate_series(
+         date_trunc('minute', NOW()) - interval '50 minutes',
+         date_trunc('minute', NOW()),
+         interval '10 minutes'
+       ) AS bucket
+       LEFT JOIN jobs ON jobs.completed_at >= bucket AND jobs.completed_at < bucket + interval '10 minutes' AND jobs.status = 'COMPLETED'
+       GROUP BY bucket
+       ORDER BY bucket ASC`
+    );
+    const throughputHistory = throughputRows;
+
     // 2. Queue Depths (using shared query)
     const queues = await getQueueDepths(pool);
 
@@ -76,7 +92,8 @@ export async function getMetrics(req: Request, res: Response, next: NextFunction
       unhealthy: unhealthyWorkers,
       total_capacity: totalCapacity,
       used_capacity: usedCapacity,
-      utilization: totalCapacity > 0 ? (usedCapacity / totalCapacity) : 0
+      utilization: totalCapacity > 0 ? (usedCapacity / totalCapacity) : 0,
+      list: workerUtil
     };
 
     // 4. Scheduler Activity (derived from recent jobs created)
@@ -101,7 +118,8 @@ export async function getMetrics(req: Request, res: Response, next: NextFunction
         failure_rate: Number(failureRate.toFixed(3)),
         retry_rate: Number(retryRate.toFixed(3)),
         avg_wait_time_ms: rates.avg_wait_time_ms ? Math.round(rates.avg_wait_time_ms) : 0,
-        avg_execution_time_ms: rates.avg_execution_time_ms ? Math.round(rates.avg_execution_time_ms) : 0
+        avg_execution_time_ms: rates.avg_execution_time_ms ? Math.round(rates.avg_execution_time_ms) : 0,
+        throughput_history: throughputHistory
       },
       queues,
       workers,

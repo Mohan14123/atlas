@@ -5,6 +5,7 @@ export function useDLQ(filters: any) {
   return useQuery({
     queryKey: ['dlq', filters],
     queryFn: () => dlqApi.list(filters),
+    refetchInterval: 5000
   });
 }
 
@@ -12,6 +13,7 @@ export function useDLQEntry(entryId: string) {
   return useQuery({
     queryKey: ['dlq-entry', entryId],
     queryFn: () => dlqApi.get(entryId),
+    refetchInterval: 5000
   });
 }
 
